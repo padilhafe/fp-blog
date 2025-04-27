@@ -6,6 +6,18 @@ draft: false
 summary: Este artigo demonstra como realizar a criação e configuração de chaves SSH para fazer login automático em servidores Linux.
 ---
 
+## Índice
+
+- [Introdução](#introducao)
+- [O que são chaves SSH?](#o-que-são-chaves-ssh)
+- [Gerando o par de chaves](#gerando-o-par-de-chaves)
+- [Copiando a chave pública para o servidor](#copiando-a-chave-pública-para-o-servidor)
+  - [Método automático (Linux)](#método-automático-linux)
+  - [Método manual](#método-manual)
+- [Exemplo de configuração do SSH (`~/.ssh/config`)](#exemplo-de-configuração-do-ssh-sshconfig)
+- [Realizando o login automático](#realizando-o-login-automático)
+- [Considerações de Segurança](#considerações-de-segurança)
+
 ## Introdução
 
 O SSH (Secure Shell) é o protocolo padrão para acesso remoto seguro a servidores Linux. Para aprimorar a segurança e eliminar a necessidade de inserir a senha manualmente a cada conexão, podemos configurar autenticação baseada em chaves públicas e privadas.

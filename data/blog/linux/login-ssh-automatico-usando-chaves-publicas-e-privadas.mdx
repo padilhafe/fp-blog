@@ -1,0 +1,126 @@
+---
+title: 'Login SSH automático usando chaves públicas e privadas' 
+date: '2025-04-27'
+tags: ['linux']
+draft: false
+summary: Este artigo demonstra como realizar a criação e configuração de chaves SSH para fazer login automático em servidores Linux.
+---
+
+## Introdução
+
+O SSH (Secure Shell) é o protocolo padrão para acesso remoto seguro a servidores Linux. Para aprimorar a segurança e eliminar a necessidade de inserir a senha manualmente a cada conexão, podemos configurar autenticação baseada em chaves públicas e privadas.
+
+Neste artigo, você aprenderá a gerar, configurar e utilizar pares de chaves SSH para login automático.
+
+## O que são chaves SSH?
+
+O mecanismo de autenticação por chave SSH utiliza um par de chaves criptográficas:
+- **Chave pública**: deve ser copiada para o servidor de destino.
+- **Chave privada**: permanece no seu computador local e nunca deve ser compartilhada.
+
+Durante a conexão, o servidor utiliza a chave pública para desafiar o cliente, que prova a identidade com a chave privada, sem necessidade de senha.
+
+## Gerando o par de chaves
+
+No seu computador local, execute o comando abaixo para gerar um novo par de chaves ED25519:
+
+```bash
+ssh-keygen -t ed25519 -C "seu-email@example.com"
+```
+
+Explicação dos parâmetros:
+- `-t ed25519`: Tipo de chave (ED25519 é mais moderno e seguro que RSA).
+- `-C "comentário"`: Adiciona uma identificação à chave.
+
+Durante o processo, você pode definir:
+- Caminho para salvar as chaves (pressione `Enter` para o padrão `~/.ssh/id_ed25519`).
+- Uma senha adicional para a chave privada (opcional, porém recomendado se usar um computador compartilhado).
+
+## Copiando a chave pública para o servidor
+
+### Método automático (Linux)
+
+No Linux, o utilitário `ssh-copy-id` pode ser utilizado para transferir a chave pública:
+
+```bash
+ssh-copy-id usuario@ip-do-servidor
+```
+
+> Observação: O `ssh-copy-id` está disponível nativamente apenas em sistemas Linux.
+
+### Método manual
+
+Se o `ssh-copy-id` não estiver disponível, siga os passos manuais:
+
+1. Conecte-se ao servidor:
+
+```bash
+ssh usuario@ip-do-servidor
+```
+
+2. No servidor, crie o diretório `.ssh` com as permissões corretas:
+
+```bash
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+```
+
+3. No seu computador local, copie o conteúdo da sua chave pública
+
+4. No servidor, edite (ou crie) o arquivo `~/.ssh/authorized_keys` e cole o conteúdo da chave pública nele:
+
+```bash
+nano ~/.ssh/authorized_keys
+```
+
+5. Ajuste as permissões:
+
+```bash
+chmod 600 ~/.ssh/authorized_keys
+```
+
+## Exemplo de configuração do SSH (`~/.ssh/config`)
+
+Para facilitar o acesso, você pode configurar o arquivo `~/.ssh/config` localmente. Com ele é possível definir a *configuração* de 
+acesso a um determinando servidor, como o endereço IP do servidor, o usuário de acesso, porta, e se irá usar uma chave para acesso.
+
+```bash
+nano ~/.ssh/config
+```
+
+Exemplo de configuração:
+
+```txt
+Host identificacao-do-servidor
+    HostName ip-do-servidor
+    User usuario
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+Agora, para se conectar, basta executar:
+
+```bash
+ssh identificacao-do-servidor
+```
+
+## Realizando o login automático
+
+Após a configuração, conecte-se ao servidor:
+
+```bash
+ssh usuario@ip-do-servidor
+```
+
+Ou, caso tenha configurado o `~/.ssh/config`, apenas:
+
+```bash
+ssh identificacao-do-servidor
+```
+
+O acesso será realizado automaticamente utilizando sua chave privada, sem solicitar a senha do usuário.
+
+## Considerações de Segurança
+
+- **Proteja a chave privada**: mantenha-a com permissão restrita (`chmod 600 ~/.ssh/id_ed25519`, assim, apenas seu usuário pode acesar o arquivo).
+- **Utilize senha na chave privada** se o ambiente for compartilhado ou se dejesa segurança extra.
+- **Revogue acessos** removendo a chave pública do arquivo `~/.ssh/authorized_keys` no servidor, caso necessário.

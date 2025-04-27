@@ -1,0 +1,271 @@
+---
+title: 'Instalação Zabbix 7 no Ubuntu - Parte I' 
+date: '2025-04-27'
+tags: ['zabbix']
+draft: false
+summary: Este artigo demonstra como realizar a instalação do Zabbix 7 no Ubuntu 24.04 de forma centralizada.
+---
+
+## Introdução
+
+O Zabbix é uma plataforma open-source de monitoramento que permite coletar, armazenar e anaisar métricas de redes, servidores, 
+contêineres e aplicações. Suportando métodos de coleta como SNMP, IPMI, agentes dedicados e consultas HTTP. Ele também oferece
+monitoramento ativo e passivo, que permite realizar coletas através de redes NAT, além de alertas configuráveis e gráficos detalhados.
+
+Sua arquitetura é composta por um servidor central que processa os dados recebidos de agentes e outras fontes, armazenadno as informações
+em um banco de dados. A interface web possibilita o gerenciamento de hosts, a criação de templates de monitoramento e a configuração
+de notificações automatizadas.
+
+Uma instalação típica do Zabbix envolve três componentes principais: o próprio Servidor Zabbix, um banco de dados e um servidor web
+para a interface gráfica. Tais componentes podem ser implantados em um único servidor ou distribuídos em várias máquinas, além de
+existir suporte para alta disponibilidade.
+
+O Zabbix pode ser instalado diretamente em hosts Linux ou via contêineres, permitindo maior flexibilidade no deploy. Nesta primeira
+parte, abordaremos a instalação do Zabbix em um ambiente Ubuntu, cobrindo requisitos, configuração inicial e primeiros passos na interface.
+Será apresentado a abordagem de instalação centralizada (todos os serviços em uma única máquina), e nas partes seguintes, a abordagem
+distribuída, baseada em contêineres e altamente disponível.
+
+---
+
+## Instalação Centralizada
+
+Nesta abordagem, todos os componente do servidor Zabbix - o próprio Servidor Zabbix, o banco de dados e a interace web - serão instalados
+na mesma máquina, facilitando a gestão e a manutenção do ambiente. Ao longo deste artigo, serão apresentados os comadnos para instalação 
+e configuração.
+
+A configuração da máquina utilizada neste artigo é:
+```sh
+felipe-padilha@ubuntu-zabbix:~$ cat /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.2 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.2 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+```
+
+Em uma instalação de produção, recomendo realizar o particionamento de disco, deixando os diretórios /, /boot e do banco de dados
+(/var/lib/\<mysql,postgres,etc\>) em partições separadas. Inclusive, se utilizar múltiplos *tier* de disco no seu ambiente, utilize
+o com maior número de *IOPS* para a partição do banco de dados.
+
+---
+
+### Atualização do sistema e instalação do banco de dados
+
+A primeira coisa que devemos fazer é atualizar o sistema operacional:
+```sh
+sudo apt update -y && sudo apt upgrade -y
+```
+
+Entãos instalamos o banco de dados, para este artigo irei utilizar o MariaDB:
+```sh
+sudo apt install mariadb-server mariadb-client -y
+```
+
+Com o banco instalado, vamos usar o utilitário **mysql_secure_installation** para fazer a configuração inicial de segurança do 
+nosso banco de dados. Este script automatiza o processo de configuração do usuário root do banco entre outos ajustes de segurança.
+```sh
+sudo mysql_secure_installation
+```
+
+O script irá fazer algumas perguntas durante sua execução. Basta seguir as respostas abaixo:
+
+- `Enter current password for root (enter for none)`: pressione `Enter`, ainda vamos configurar a senha do root.
+- `Switch to unix_socket authentication [Y/n]`: pressione `n`, queremos permitir conexões ao banco de dados via rede.
+- `Change the root password? [Y/n]`: pressione `y`.
+- `New password`: defina a nova senha do usuário `root`.
+- `Re-enter new password`: repita a senha definida.
+- `Remove anonymous users? [Y/n]`: pressione `y`.
+- `Disallow root login remotely? [Y/n]`: pressione `y`.
+- `Remove test database and access to it? [Y/n]`: pressione `y`.
+- `Reload privilege tables now? [Y/n]`: pressione `y`.
+
+
+Feito isso, temos a instalação do nosso MariaDB protegida. Agora, vamos acessá-lo para criarmos o banco de dados do Zabbix e o usuário 
+de acesso, execute os comandos abaixo para configurar o banco de dados:
+```sh
+# Definindo variáveis
+ZABBIX_DB="zabbix"
+ZABBIX_DB_USER="zabbix"
+ZABBIX_DB_PASSWORD="senha_segura"
+
+sudo mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`${ZABBIX_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE USER IF NOT EXISTS '${ZABBIX_DB_USER}'@'localhost' IDENTIFIED BY '${ZABBIX_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${ZABBIX_DB}\`.* TO '${ZABBIX_DB_USER}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+```
+
+**Explicação dos comandos:**
+- **ZABBIX_DB="zabbix"**: cria uma variável chamada `ZABBIX_DB` e atribui o valor `zabbix`.
+- **ZABBIX_DB_USER="zabbix"**: cria uma variável chamada `ZABBIX_DB_USER` e atribui o valor `zabbix`.
+- **ZABBIX_DB_PASSWORD="senha_segura"**: cria uma variável chamada `ZABBIX_DB_PASSWORD` e atribui o valor `senha_segura`.
+- **sudo mysql -u root &#60;&#60; EOF;**: conecta no MariaDB/MySQL como usuário `root` solicitando senha, e inicia um bloco de comandos via `heredoc`.
+- **CREATE DATABASE IF NOT EXISTS \$\{ZABBIX_DB\} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;**: cria o banco de dados, se não existir, com charset `utf8mb4` e collation `utf8mb4_bin`.
+- **CREATE USER IF NOT EXISTS \$\{ZABBIX_DB_USER\}@'localhost' IDENTIFIED BY '\$\{ZABBIX_DB_PASSWORD\}';**: cria o usuário do banco de dados (caso ainda não exista) e define sua senha de acesso.
+- **GRANT ALL PRIVILEGES ON \$\{ZABBIX_DB\}.\* TO \$\{ZABBIX_DB_USER\}@'localhost';**: concede todos os privilégios sobre o banco de dados criado ao usuário recém-criado.
+- **FLUSH PRIVILEGES;**: força o MySQL a recarregar as permissões imediatamente.
+- **EOF**: finaliza o bloco `heredoc`, enviando todos os comandos acima para execução no banco.
+
+Lembre-se de alterar os valores de *ZABBIX_DB*, *ZABBIX_DB_USER* e *ZABBIX_DB_PASSWORD* para os valores reais de sua instalação.
+
+---
+
+### Instalação e configuração da aplicação Zabbix
+
+A primeira coisa que precisamos fazer é instalar o repositório Zabbix para termos acesso a versão 7.
+```sh
+wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu24.04_all.deb
+sudo dpkg -i zabbix-release_latest+ubuntu24.04_all.deb
+sudo rm zabbix-release_latest+ubuntu24.04_all.deb
+sudo apt update -y
+```
+
+Com o repositório instalado, agora temos acesso aos pacotes do Zabbix para instalarmos:
+```sh
+sudo apt install -y \
+    zabbix-server-mysql \
+    zabbix-frontend-php \
+    zabbix-nginx-conf \
+    zabbix-agent \
+    zabbix-sql-scripts
+```
+
+Com tudo isntalado, precisamos alterar algumas configurações nos arquivos .conf do Zabbix e do Nginx, além de popular o banco de dados.
+Para não ser ncessário utilizar um editor de texto com oo Nano ou Vim, deixo abaixo os comadnos utilizando o *sed* para alterar as linhas 
+de texto via expressão regular. Não esqueça de alterar as variáveis para os valores do seu ambiente.
+```sh
+# Definindo variáveis
+SERVER_NAME="seu.dominio.com"
+SERVER_PORT="80"
+
+# Atualizar a senha do banco de dados no arquivo de configuração do Zabbix
+sudo sed -i "s/^#\s*\(DBPassword=\).*/\1${ZABBIX_DB_PASSWORD}/" /etc/zabbix/zabbix_server.conf
+
+# Atualizar a porta do servidor no Nginx
+sudo sed -i -E "s@#(\s*listen\s+)8080;@\1${SERVER_PORT};@" /etc/zabbix/nginx.conf
+
+# Atualizar o nome do servidor no Nginx
+sudo sed -i -E "s@#(\s*server_name\s+)example.com;@\1${SERVER_NAME};@" /etc/zabbix/nginx.conf
+
+# Definir o timezone no PHP-FPM
+echo "php_value[date.timezone] = America/Sao_Paulo" | sudo tee -a /etc/zabbix/php-fpm.conf
+```
+
+Lembrando que **seu.dominio.com** pode simplesmente ser o endereço IP da máquina.
+
+Para popularmos o banco de dados com as tabelas esperadas pela aplicação Zabbix, usamos o comando abaixo:
+```sh
+zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -u"${ZABBIX_DB_USER}" -p"${ZABBIX_DB_PASSWORD}" "${ZABBIX_DB}"
+```
+
+Por fim, reiniciamos o serviço do Zabbix e do Nginx para ler as configurações novas e habilitamos a inicialização dos serviços junto com a máquina.
+```sh
+sudo systemctl restart zabbix-server zabbix-agent nginx
+sudo systemctl enable zabbix-server zabbix-agent nginx
+```
+
+---
+
+### Últimas configurações e primeiro acesso
+
+Navegue até http://seu.dominio.com ou o endereço IP do seu servidor (depende do que configurou no parâmetro SERVER_NAME) para finalizar
+as configurações do seu Zabbix. Ao acessar, você irá cair nesta página:
+![Blog0001Imagem0001](/images/blog0001-img0001.png)
+
+Apenas clique em **Próximo passo** para continuarmos.
+
+Valide que está tudo OK e clique em **Próximo passo**
+![Blog0001Imagem0002](/images/blog0001-img0002.png)
+
+Preencha com as informações do seu banco de dados (definimos nas variáveis ZABBIX_DB, ZABBIX_DB_USER e ZABBIX_DB_PASSWORD) e clique em **Próximo passo**
+![Blog0001Imagem0005](/images/blog0001-img0003.png)
+
+Aqui você pode dar um nome para sua instalação. Depois de preenchido, clique em **Próximo passo**
+![Blog0001Imagem0004](/images/blog0001-img0004.png)
+
+A tela de resumo das configurações que foram feitas. Clique em **Próximo passo**
+![Blog0001Imagem0005](/images/blog0001-img0005.png)
+
+Com isso nossa instalação termina e temos um servidor Zabbix funcional. Clique em **Fim** para ser direcionado a tela de login.
+![Blog0001Imagem0006](/images/blog0001-img0006.png)
+
+O usuário padrão é *Admin* e a senha é *zabbix*.
+![Blog0001Imagem0007](/images/blog0001-img0007.png)
+
+E caimos na dashboard padrão da instalação. Meus parabéns, você concluiu a instalação!
+![Blog0001Imagem0008](/images/blog0001-img0008.png)
+
+---
+
+### Script de Instalação
+Os comandos abaixos são todos os comandos executados para realizar a instalação do Zabbix. Como está usando variáveis, é possível 
+apenas alterar seus valores, copiar e colar para ter uma instalação funcional, ou você copiar para um arquivo, dar permissão de execução 
+e executar como um script.
+```sh
+#!/bin/bash
+# Script de Instalação do Zabbix 7 no Ubuntu 24.04 - Instalação Centralizada
+
+# Definindo variáveis
+ZABBIX_DB="zabbix"
+ZABBIX_DB_USER="zabbix"
+ZABBIX_DB_PASSWORD="senha_segura"
+SERVER_NAME="seu.dominio.com"
+SERVER_PORT="80"
+
+# Atualizar o sistema
+sudo apt update -y && sudo apt upgrade -y
+
+# Instalar o MariaDB
+sudo apt install -y mariadb-server mariadb-client
+
+# Configurar o MariaDB
+sudo mysql_secure_installation <<EOF
+
+n
+y
+$ZABBIX_DB_PASSWORD
+$ZABBIX_DB_PASSWORD
+y
+y
+y
+y
+EOF
+
+# Criar banco de dados e usuário para o Zabbix
+sudo mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`${ZABBIX_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE USER IF NOT EXISTS '${ZABBIX_DB_USER}'@'localhost' IDENTIFIED BY '${ZABBIX_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${ZABBIX_DB}\`.* TO '${ZABBIX_DB_USER}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+# Instalar o repositório do Zabbix 7
+wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu24.04_all.deb
+sudo dpkg -i zabbix-release_latest+ubuntu24.04_all.deb
+sudo rm zabbix-release_latest+ubuntu24.04_all.deb
+sudo apt update -y
+
+# Instalar pacotes do Zabbix
+sudo apt install -y \
+    zabbix-server-mysql \
+    zabbix-frontend-php \
+    zabbix-nginx-conf \
+    zabbix-agent \
+    zabbix-sql-scripts
+
+# Configurar Zabbix server e Nginx
+sudo sed -i "s/^#\s*\(DBPassword=\).*/\1${ZABBIX_DB_PASSWORD}/" /etc/zabbix/zabbix_server.conf
+sudo sed -i -E "s@#(\s*listen\s+)8080;@\1${SERVER_PORT};@" /etc/zabbix/nginx.conf
+sudo sed -i -E "s@#(\s*server_name\s+)example.com;@\1${SERVER_NAME};@" /etc/zabbix/nginx.conf
+echo "php_value[date.timezone] = America/Sao_Paulo" | sudo tee -a /etc/zabbix/php-fpm.conf
+
+# Popular banco de dados com as tabelas do Zabbix
+zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -u"${ZABBIX_DB_USER}" -p"${ZABBIX_DB_PASSWORD}" "${ZABBIX_DB}"
+
+# Reiniciar e habilitar serviços
+sudo systemctl restart zabbix-server zabbix-agent nginx
+sudo systemctl enable zabbix-server zabbix-agent nginx
+
+echo "Instalação concluída! Acesse http://${SERVER_NAME}:${SERVER_PORT} para continuar a configuração via interface web."
+```

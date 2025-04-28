@@ -1,0 +1,170 @@
+---
+title: 'Instalação do PNETLab para criar ambientes virtuais de redes e infraestrutura' 
+date: '2025-02-10'
+tags: ['virtualizacao']
+draft: false
+summary: O artigo demonstra como realizar a instalação do PNETLab para realizar laboratórios de rede infraestrutura.
+---
+
+## Índice
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Download do VMWare Workstation Pro](#download-do-vmware-workstation-pro)
+  - [Instalação do VMWare Workstation Pro](#instalação-do-vmware-workstation-pro)
+- [Download e Instalação do PNETLab](#download-e-instalação-do-pnetlab)
+  - [Importando a VM do PNETLab](#importando-a-vm-do-pnetlab)
+- [Download do iShare2](#download-do-ishare2)
+  - [Usando o iShare2](#usando-o-ishare2)
+- [Primeiro Laboratório](#primeiro-laboratório)
+
+
+## Introdução
+O **PNETLab** é uma plataforma de simulação e emulação de redes baseado no **EVE-NG**. Projetada para ambientes de treinamento e testes, ele permite a criação de laboratórios virutais para estudo de redes, segurança, automação. Suporta a emulação de dispositivos como: roteadores, switches, firewalls, servidores e hipervisores de diversos fabricantes.
+
+Diferente dos simuladores tradicionais, o **PNETLab** utiliza máquinas virtuais reais, proporcionando um ambiente próximo ao de produção. Além disso, oferece recursos como suporte a *KVM/QEMU*, integração com *Docker* e um painel web intuitivo para criação e gerenciamento de topologias.
+
+Neste artigo, abordaremos a instalação do **PNETLab**, incluindo os requisitos necessários e primeiros passos para a configuração, uso e download das imagens dos equipamentos.
+
+### Link para o tutorial em vídeo
+<YouTube id="dBZ5Y_cFSSY"/>
+
+---
+
+## Download do VMWare Workstation Pro
+
+O **PNETLab**, assim como o EVE-NG, precisa ser instalado em um hipervisor com suporte a Intel VT-x ou AMD-V, como o VMWare Workstation Player ou Pro. Desde que a Broadcom adquiriu a VMWare, o Workstation Pro se tornou um produto gratuito e não mais pago. Basta termos uam conta na Broadcom para podermos fazer o download do aplicativo.
+
+Caso ainda não tenha uma conta, se registre na Broadcom a partir deste [endereço](https://profile.broadcom.com/web/registration), que irá abrir a página de cadastro do portal de suporte da Broadcom. Após realizado o cadastro, realize o login também.
+![virt1-img1](/images/virt1-img1.png)
+
+Após realizado o login, você deverá clicar no botão com o desenho de três nuvens e selecionar a opção **VMWare Cloud Foundation**.
+![virt1-img2](/images/virt1-img2.png)
+
+Na dashboard, clique em **My Downloads** e pesquise por **Workstation**. Clique em **VMWare Workstation Pro**. Se não aparecer nada, siga este [link](https://support.broadcom.com/group/ecx/free-downloads), o mesmo irá te direcionar para a página de free downloads.
+![virt1-img3](/images/virt1-img3.png)
+
+
+Selecione a última versão disponível para sua plataforma, Windows ou Linux.
+![virt1-img4](/images/virt1-img4.png)
+
+Marque a caixa **I agree to the Terms and Conditions** (após ler os termos e condições), seu download será liberado (você irá perceber que o símbolo da nuvem com uma seta para baixo ficará mais escuro).
+![virt1-img5](/images/virt1-img5.png)
+
+### Instalação do VMWare Workstation Pro
+
+Caso você tenha Docker ou o WSL instalado no Windows, terá que desativá-los, pois não será possível usá-los junto do VMware Workstation. Para desativar, procure por *Ativar ou Desativar Recursos do Windows* no menu iniciar e desative as opções:
+- Plataforma Hipervisor do Windows
+- Virtual Machine Platform
+
+Reinicie o seu computador e prossiga com a instalação.
+
+> A instalação não tem segredo, segue o padrão NNF (Next, Next, Finish). Sua rede irá cair durante a instalação e ao final, você terá que reiniciar seu computador.
+
+---
+
+## Download e Instalação do PNETLab
+
+Para realizar o download da última versão disponível do PNETLab, siga este [link](https://pnetlab.com/pages/download). Você irá baixar um arquivo `.ova` que devemos importar para dentro do VMware Workstation.
+
+### Importando a VM do PNETLab
+
+Abra o VMware Workstation Pro e na barra de ferramentas clique em *File -> Open* ou utilize o atalho *CTRL + O*, procure pelo arquivo do `.ova` que baixou e abra ele.
+
+Dê um nome a VM do PNETLab e selecione o local que deseja salvar o disco rigido virtual da mesma. Após, clique em *Import* e aguarde a importação da máquina, mas ainda não a inicie.
+![virt1-img6](/images/virt1-img6.png)
+
+Selecione a VM na interface do Workstation Pro e clique em *Edit Virtual Machine Settings*. 
+![virt1-img7](/images/virt1-img7.png)
+
+Os parâmetros que precisamos modificar são:
+- **Memory:** por padrão a máquina vem configurada com 8GB, ajuste conforme seu computador, recomendo ao menos 4GB de RAM para rodar os laboratórios. Quanto mais pesada a imagem que irá emular, mais RAM precisa ser alocada para o PNETLab;
+- **Processors:** altere o *Number of Processors* para 1 (ou 2 se usar placas x99 de dois sockets e tiver dois processadores instalados...) e ajuste o *Number of cores per processor* conforme seu computador. Habilite a opção **Virtualize Intel VT-x/EPT or AMD-V/RVI** (lembrando que estas extensões precisam ser habilitadas na BIOS do seu computador também).
+![virt1-img8](/images/virt1-img8.png)
+
+O restante das configurações você não precisa mexer. Clique em OK no final desta janela e inicie a máquina.
+
+Quando a máquina iniciar você irá cair no prompt de login, o usuário padrão é **root** e a senha é **pnet**, realize login para terminar a configuração.
+
+Você irá cair em um utilitário de configuração, a primeira coisa é fornecermos a nova senha do usuário root (duas vezes).
+![virt1-img9](/images/virt1-img9.png)
+
+Ele irá perguntar pelo domínio DNS, você pode limpar o que estiver preenchido e pressionar **enter**.
+![virt1-img10](/images/virt1-img10.png)
+
+Matenha a opção como DHCP (mas você pode preencher um endereço IP estático também)
+![virt1-img11](/images/virt1-img11.png)
+
+Para sincronização do relógio eu costumo usar o servidor **a** do ntp.br mesmo.
+![virt1-img12](/images/virt1-img12.png)
+
+A menos que você utilize um proxy na sua rede, mantenha como **direct connection**.
+![virt1-img13](/images/virt1-img13.png)
+
+A VM irá reiniciar com as novas configurações. Quando for solicitado o login novamente, vamos fazer uma nova conexão via SSH. Utilize o endereço que aparece no prompt para se conectar a VM.
+![virt1-img14](/images/virt1-img14.png)
+
+## Download do iShare2
+
+O [iShare2](https://github.com/ishare2-org/ishare2-cli) é uma ferramenta de compartilhamento e gerenciamento de imagens de roteadores, switches, firewalls e sistemas operacionais. Com ele podemos baixar imagens para usar nos laboratórios e automatizar as configurações das mesmas no PNETLab.
+
+> Lembre-se sempre de utilizar imagens que você detenha os direitos de uso. Não me responsabilizo por eventuais processos ou danos decorrentes da utilização de produtos piratas.
+
+Para baixarmos o **iShare2**, executamos o comando abaixo:
+```sh
+wget -O /usr/sbin/ishare2 https://raw.githubusercontent.com/ishare2-org/ishare2-cli/main/ishare2 && chmod +x /usr/sbin/ishare2 && ishare2
+```
+
+Ou, se não houver o `wget` instalado no sistema:
+```sh
+curl -O /usr/sbin/ishare2 https://raw.githubusercontent.com/ishare2-org/ishare2-cli/main/ishare2 && chmod +x /usr/sbin/ishare2 && ishare2
+```
+
+O script irá auxiliar na instalção da ferramenta. Ele irá baixar as dependências e realizar a configuração da ferramenta. O mesmo irá te fazer algumas perguntas (se deseja usar o aric2 para download, se deseja verificar certificados SSL, qual branch do aplicativo deseja usar e de quaal mirror irá baixar as imagens), basta pressionar enter em todas as opções.
+
+### Usando o iShare2
+
+O fluxo de uso do iShare2 se resume em:
+- Procurar por uma imagem, usando o comando: `ishare2 search "nome_imagem"`
+- Baixar a imagem (pull), através do comando: `ishare2 pull <plataforma> <id_imagem>`
+
+Ele já irá se encarregar de configurar a imagem para funcionar junto do pnet lab.
+
+Abaixo, está um exemplo de como podemos usar o iShare2 para baixar uma imagem `mikrotik-7.8`.
+![virt1-img15](/images/virt1-img15.png)
+
+Primeiro, precisamos descobrir o ID da imagem que desejamos baixar, então executamos `ishare2 search mikrotik-7`:
+![virt1-img16](/images/virt1-img16.png)
+
+Verificamos que é uma imagem QEMU e com ID 904, então executamos `ishare2 pull qemu 904` para baixar. Depois de baixado, já podemos usar a imagem no PNETLab.
+![virt1-img17](/images/virt1-img17.png)
+
+## Primeiro Laboratório
+
+Acesse a interface web do iShare, pelo mesmo endereço IP que foi usado para conexão do SSH. Se for o primeiro acesso, terá que optar entre **Online Mode** e **Offline Mode**, aconselho usar o modo offline.
+![virt1-img18](/images/virt1-img18.png)
+
+Realize login usando o usuário **admin** e senha **pnet**, para usar o *default console* você precisa baixar e instalar o programa disponível neste [link](https://www.eve-ng.net/index.php/download/#DL-WIN), caso contrário, altere para *HTML Console*.
+![virt1-img19](/images/virt1-img19.png)
+
+Clique no botão de **add new lab**
+![virt1-img20](/images/virt1-img20.png)
+
+Dê um nome ao laboratório e clique no botão **Add**
+![virt1-img21](/images/virt1-img21.png)
+
+Agora, vamos colocar a imagem Mikrotik que acabamos de baixar validar que está funcionando. Clique com o botão direito em qualquer local na página do laborótio e clique em **Node**
+![virt1-img22](/images/virt1-img22.png)
+
+Se estiver tudo certo, vamos conseguir ver a opção de colocar um nó **Mikrotik RouterOS**
+![virt1-img23](/images/virt1-img23.png)
+
+Não é necessário mexer em nada nas configurações do nó, basta clicar no botão **Save** na parte de baixo.
+![virt1-img24](/images/virt1-img24.png)
+
+Passe o mouse por cima do nó adicionado e clique no botão start.
+![virt1-img25](/images/virt1-img25.png)
+
+Aguarde alguns minutos e clique novamente sobre o nó que adicionamos, deverá abrir o console com a tela de login (se estiver preto, pressione enter para ligá-lo).
+![virt1-img26](/images/virt1-img26.png)
+
+E com isso finalizamos o artigo e você já tem em mãos uma das melhores plataformas para estudar redes e infraesturtura!

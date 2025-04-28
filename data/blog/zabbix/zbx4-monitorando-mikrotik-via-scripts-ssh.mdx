@@ -1,0 +1,66 @@
+---
+title: 'Monitoramento de PPPoE, DHCP e OSPF por Interface no Mikrotik usando scritps' 
+date: '2025-03-10'
+tags: ['zabbix']
+draft: true
+summary: Este artigo fornece orientações para criação de scripts que podem ser integrados ao Zabbix para monitoramento de link de internet.
+---
+
+## Introdução
+Embora o Mikrotik ofereça suporte a SNMP para monitoramento, nem todos os parâmetros ou estados são facilmente exportáveis por ele, especialmente em cenários mais complexos. Muitas informações dinâmicas — como leases de DHCP por interface, sessões PPPoE e adjacências OSPF — não estão disponíveis para monitoramento via SNMP.
+
+O Mikrotik RouterOS possui uma linguagem de script própria, que apesar de limitada em alguns aspectos, permite realizar tarefas de consulta, processamento e formatação de dados.
+
+Ao estruturarmos a saída dos scripts em formato JSON, facilitamos a integração com ferramentas como o Zabbix, (ou qualquer sistema que consiga fazer parsing de JSON). Essa abordagem reduz o esforço de tratamento da resposta, tornando o monitoramento muito mais direto e padronizado.
+
+### Link para o tutorial em vídeo
+<YouTube id="L3BJZMVtCCQ"/>
+
+---
+
+## Quantidade de Leases DHCP por Interface
+
+O primeiro script tem como objetivo listar, para cada servidor DHCP configurado no Mikrotik, a quantidade de leases ativos agrupados pela interface.
+
+Ele gera uma saída em JSON estruturado, com cada item contendo:
+- Interface
+- Nome do servidor DHCP
+- Quantidade de leases
+
+Você deverá salvar o script abaixo em *System -> Scripts*. Nomeie como `monitoramento_dhcp` e a única permissão necessária é a de *read* (leitura).
+
+```python
+:global lista [/ip dhcp-server find];
+:global total [:len $lista];
+:global contador 0;
+
+:put "{ \"data\": [";
+
+:foreach i in=$lista do={
+    :local servidor [/ip dhcp-server get value-name=name $i];
+    :local interface [/ip dhcp-server get value-name=interface $i];
+    :local leases [:len [/ip dhcp-server lease find where server=$servidor]];
+
+    :if ($contador < $total) do={
+        :if ($contador = ($total - 1)) do={
+            :put ("{ \"interface\": \"$interface\", \"servidor\": \"$servidor\", \"dados\": { \"leases\": $leases } }");
+        } else={
+            :put ("{ \"interface\": \"$interface\", \"servidor\": \"$servidor\", \"dados\": { \"leases\": $leases } },");
+        }
+    };
+    :set contador ($contador + 1);
+};
+
+:put "] }";
+```
+
+### Configuração do item no Zabbix
+
+Vamos usar dois itens, um item normal, que irá executar o script e receber o retorno de todas as entradas e um item de descoberta automática dependente, que para cada entrada irá criar um item de monitoramento.
+
+Para o item mestre, configure como a imagem abaixo:
+
+
+---
+
+## Quantidade de sessões PPPoE por Interface

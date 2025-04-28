@@ -1,4 +1,5 @@
 {
+  "zabbix": 5,
   "linux": 1,
-  "zabbix": 4
+  "virtualizacao": 1
 }

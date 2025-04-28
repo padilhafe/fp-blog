@@ -13,7 +13,6 @@ summary: Este artigo fornece orientações para criação de scripts que podem s
 - [Monitoramento da quantidade de saltos](#monitoramento-da-quantidade-de-saltos)
 - [Monitorando o tempo de resolução DNS](#monitorando-o-tempo-de-resolução-dns)
 
-
 ## Introdução
 No cenário atual, garantir a qualidade do link de internet é essencial para a operação de qualquer infraestrutura de TI. Utilizando o Zabbix, podemos monitorar diversos aspectos da  rede com soluções simples e eficazes.
 
@@ -108,6 +107,11 @@ Criamos um host para criar os itens de monitoramento no Zabbix:
 
 E criamos o item de monitoramento, neste caso, monitorando a latência ICMP até o 8.8.8.8.
 ![zbx5-img2](/images/zbx5-img2.png)
+- **Nome:** Tempo de resposta para 8.8.8.8
+- **Tipo:** Monitoramento externo
+- **Chave:** tempo_reposta.sh[8.8.8.8]
+- **Tipo de Informação:** Número fracionário
+- **Unidades:** ms
 
 Você pode criar quantos itens quiser, também pode usar endereços DNS no lugar dos endereços IP.
 
@@ -145,6 +149,10 @@ sudo chmod 774 /usr/lib/zabbix/externalscripts/quantidade_saltos.sh
 
 E crie o item no Zabbix:
 ![zbx5-img3](/images/zbx5-img3.png)
+- **Nome:** Quantidade de saltos para 8.8.8.8
+- **Tipo:** Monitoramento externo
+- **Chave:** quantidade_saltos.sh[8.8.8.8]
+- **Tipo de Informação:** Inteiro (na imagem está errado.)
 
 Caso você ainda não tenha o `mtr` instalado, pode fazer por meio do comando: `sudo apt install -y mtr`
 
@@ -185,3 +193,7 @@ sudo chmod 774 /usr/lib/zabbix/externalscripts/consulta_dns.sh
 
 E por fim, criamos o item de monitoramento, mas desta vez passando dois parâmetros, o servidor de resolução e a consulta:
 ![zbx5-img4](/images/zbx5-img4.png)
+- **Nome:** Resolução DNS 8.8.8.8 - youtube.com.br
+- **Tipo:** Monitoramento externo
+- **Chave:** consulta_dns.sh[8.8.8.8,youtube.com.br]
+- **Tipo de Informação:** Numérico (fracionário)

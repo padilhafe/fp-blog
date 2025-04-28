@@ -1,0 +1,187 @@
+---
+title: 'Como usar o Zabbix para monitorar a qualidade do link de Internet' 
+date: '2025-03-12'
+tags: ['zabbix']
+draft: false
+summary: Este artigo fornece orientações para criação de scripts que podem ser integrados ao Zabbix para monitoramento de link de internet.
+---
+
+## Índice
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Primeiro Script: Monitoramento do Tempo de Resposta (ICMP)](#primeiro-script-monitoramento-do-tempo-de-resposta-icmp)
+- [Monitoramento da quantidade de saltos](#monitoramento-da-quantidade-de-saltos)
+- [Monitorando o tempo de resolução DNS](#monitorando-o-tempo-de-resolução-dns)
+
+
+## Introdução
+No cenário atual, garantir a qualidade do link de internet é essencial para a operação de qualquer infraestrutura de TI. Utilizando o Zabbix, podemos monitorar diversos aspectos da  rede com soluções simples e eficazes.
+
+Neste artigo, vamos demonstrar como construir três scripts básicos para monitorar:
+- Tempo de resposta ICMP (ping).
+- Quantidade de saltos até um destino.
+- Tempo de resposta de resoluções DNS.
+
+Esses scripts serão executados diretamente no servidor Zabbix, proporcionando uma visão clara da qualidade do link de internet.
+
+### Link para o tutorial em vídeo
+<YouTube id="cBLEDRRP6IA"/>
+
+---
+
+## Primeiro Script: Monitoramento do Tempo de Resposta (ICMP)
+
+### O problema com o ping tradicional
+Ao utilizar o comando ping, mesmo limitando a quantidade de pacotes, a saída padrão é extremamente verbosa e difícil de processar diretamente no Zabbix. Além disso, a extração de informações como o tempo de resposta médio exige manipulação textual.
+
+Exemplo de saída do ping:
+```sh
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+64 bytes from 8.8.8.8: icmp_seq=0 ttl=117 time=11.0 ms
+...
+```
+
+**Solução: Utilizando fping**
+O fping é uma alternativa ao ping que retorna saídas muito mais limpas e fáceis de manipular:
+```sh
+sudo apt install fping -y
+fping -e 8.8.8.8
+8.8.8.8 : [0], 11.3 ms (min 11.3 ms avg 11.3 ms max 11.3 ms)
+```
+
+### Processando a saída
+Para extrair apenas o tempo de resposta de forma automatizada, podemos utilizar cut: `fping -e 8.8.8.8 | cut -d '(' -f2 | cut -d ' ' -f1`
+
+Este comando:
+- Usa o primeiro cut para isolar o conteúdo dentro dos parênteses.
+- Usa o segundo cut para pegar apenas o tempo de resposta.
+
+Resultado:
+```sh
+felipe-padilha@ubuntu-zabbix:~$ fping -e 8.8.8.8 | cut -d '(' -f2 | cut -d ' ' -f1
+12.6
+```
+
+Este valor pode ser facilmente consumido pelo Zabbix já que se trata de um número de ponto flutuante (decimal)
+
+### Antes de começar
+O Zabbix por padrão vem configurado para que scripts de monitoramento ou monitoramento externo (o tipo de item que vamos usar neste artigo) não ultrapassem 3 segundos de tempo de execução, antes de serem encerrados de forma forçada. 
+
+Será necessário aumentar esse tempo, principalmente para ser possível o monitoramento de quantidade de saltos, que pode levar algo em torno de 10 segundos a depender da rede.
+
+Para isso, vá até *Administração -> Geral -> Timeouts* e aumente o timeout da opção **Monitoramento externo** de 3 para 10 segundos.
+![zbx5-img0](/images/zbx5-img0.png)
+
+---
+
+## Criando o Script Bash de monitoramento ICMP para o Zabbix consumir
+O Zabbix pode ler scripts de monitoramento externo, bem como passar parâmetros para execução dos mesmos. Nossos scripts de monitoramento deste artigo farão uso dessa função nativa dele, usando simples bash scripts para executar um comando, filtrar sua saída e retornar uma saída para o Zabbix.
+
+```sh
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "Uso: $0 <host>"
+    exit 1
+fi
+
+host=$1
+output=$(fping $host -e)
+
+if echo "$output" | grep -q "is alive"; then
+    tempo=$(echo "$output" | cut -d "(" -f2 | cut -d " " -f1)
+    echo "$tempo"
+else
+    echo "9999"
+    exit 2
+fi
+```
+
+Salve o script acima, no diretório `/usr/lib/zabbix/externalscripts/`, você pode dar o nome que preferir, mas sugiro salvá-lo como `tempo_resposta.sh`. Depois, vamos ajustar as permissões para que o Zabbix consiga executar o arquivo por meio dos comandos:
+```sh
+sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/tempo_resposta.sh
+sudo chmod 774 /usr/lib/zabbix/externalscripts/tempo_resposta.sh
+```
+
+Criamos um host para criar os itens de monitoramento no Zabbix: 
+![zbx5-img1](/images/zbx5-img1.png)
+
+E criamos o item de monitoramento, neste caso, monitorando a latência ICMP até o 8.8.8.8.
+![zbx5-img2](/images/zbx5-img2.png)
+
+Você pode criar quantos itens quiser, também pode usar endereços DNS no lugar dos endereços IP.
+
+---
+
+## Monitoramento da quantidade de saltos
+Neste caso, utilizaremos o comando `mtr`, que é uma ferramenta que combina as funcionalidades do traceroute e do ping, gerando relatórios de quantidade de saltos.
+
+O objetivo será calcular quantos saltos existem até determinado destino e retornar esse valor para o Zabbix.
+```sh
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "Uso: $0 <host>"
+    exit 1
+fi
+
+host=$1
+output=$(mtr $host -n -r -c 1 | tail -n1)
+
+if echo "$output" | grep -q "???"; then
+    echo "9999"
+    exit 2
+else
+    saltos=$(echo "$output" | awk '{print $1}' | cut -d "." -f 1)
+    echo "$saltos"
+fi
+```
+
+Novamente, salve o script acima no diretório `/usr/lib/zabbix/externalscripts/`, com o nome sugerido de `quantidade_saltos.sh`. Também ajuste as permissões:
+```sh
+sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/quantidade_saltos.sh
+sudo chmod 774 /usr/lib/zabbix/externalscripts/quantidade_saltos.sh
+```
+
+E crie o item no Zabbix:
+![zbx5-img3](/images/zbx5-img3.png)
+
+Caso você ainda não tenha o `mtr` instalado, pode fazer por meio do comando: `sudo apt install -y mtr`
+
+---
+
+## Monitorando o tempo de resolução DNS
+Neste caso, utilizaremos a ferramenta `dig`, que praticamente qualquer distribuição já vem pré-instalada e é muito utilizada para validar se o DNS recursivo está funcionando.
+```sh
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+    echo "Uso: $0 <servidor_dns> <dominio>"
+    exit 1
+fi
+
+servidor=$1
+dominio=$2
+
+resultado=$(dig @$servidor $dominio | egrep "HEADER|Query")
+status=$(echo "$resultado" | grep -oP "(?<=status: )\w+")
+
+if [ "$status" = "NOERROR" ]; then
+    consulta=$(echo "$resultado" | grep -oP "(?<=Query time: )\d+")
+    echo "$consulta"
+else
+    echo "9999"
+    exit 2
+fi
+```
+
+Salve o script acima, também, no diretório `/usr/lib/zabbix/externalscripts/`, e um bom nome para ele seria **consulta_dns.sh**.
+
+Depois, ajuste as permissões corretamente para que o Zabbix possa executar o script:
+```sh
+sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/consulta_dns.sh
+sudo chmod 774 /usr/lib/zabbix/externalscripts/consulta_dns.sh
+```
+
+E por fim, criamos o item de monitoramento, mas desta vez passando dois parâmetros, o servidor de resolução e a consulta:
+![zbx5-img4](/images/zbx5-img4.png)

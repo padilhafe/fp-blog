@@ -1,5 +1,5 @@
 ---
-title: 'Configuração FailOver e LoadBalance no Mikrotik v7 - Parte I' 
+title: 'Configuração FailOver e Balanceamento de Links no Mikrotik v7 - Parte I' 
 date: '2025-03-07'
 tags: ['mikrotik']
 draft: false
@@ -18,7 +18,7 @@ summary: Este artigo demonstra como configurar FailOver via Roteamento Recursivo
 ---
 
 ## Introdução
-Neste artigo, vamos abordar duas das técnicas mais importantes e utilizadas para garantir alta disponibilidade e desempenho em conexões WAN: o **failover recursivo** e o **balanceamento de carga via PCC** (Per Connection Classifier).
+Neste artigo, vamos abordar duas das técnicas mais importantes e utilizadas para garantir alta disponibilidade e desempenho em conexões WAN: o **failover recursivo** e o **balanceamento de links via PCC** (Per Connection Classifier).
 
 O roteamento recursivo permite que o MikroTik identifique falhas no link principal de forma inteligente, redirecionando o tráfego automaticamente para uma rota de backup. Já o PCC, por sua vez, oferece uma abordagem capaz de distribuir conexões entre múltiplos links, mesmo quando possuem velocidades ou capacidades diferentes.
 

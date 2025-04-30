@@ -19,12 +19,23 @@ Ao estruturarmos a saída dos scripts em formato JSON, facilitamos a integraçã
 ---
 
 ## Explicação geral do funcionamento dos scripts
-Os scripts tem como objetivo listar, em formato JSON, informações da Mikrotik que não podem ser acessadas via monitoramento SNMP. 
-- Interface
-- Nome do servidor DHCP
-- Quantidade de leases
+Os scripts são executados diretamente no RouterOS via SSH e têm como objetivo coletar informações que não são facilmente acessíveis via SNMP. Cada script percorre os elementos desejados (interfaces, servidores PPPoE, adjacências OSPF, etc.), extrai dados relevantes e os organiza em formato JSON, facilitando o consumo por sistemas de monitoramento como o Zabbix.
 
-Você deverá salvar o script abaixo em *System -> Scripts*. Nomeie como `monitoramento_dhcp` e a única permissão necessária é a de *read* (leitura).
+A estrutura geral do funcionamento dos scripts é:
+- Coleta dos dados relevantes (ex.: servidores DHCP, sessões PPPoE, vizinhos OSPF);
+- Contagem ou leitura de atributos de cada objeto (ex.: quantidade de leases, clientes ativos, estado da adjacência);
+- Construção de um objeto JSON por item, contendo:
+  - Um identificador (ex.: interface, servidor, router_id);
+  - Um objeto com os valores monitoráveis (ex.: leases, clientesAtivos, mudancas_estado);
+- Montagem final em JSON válido com todos os itens dentro de uma lista em data.
+
+Esse formato permite:
+- Utilizar Low-Level Discovery (LLD) no Zabbix para identificar dinamicamente os itens a serem monitorados;
+- Configurar Item Prototypes com JSONPath para extrair dados específicos;
+
+O script deve ser salvo em *System -> Scripts* e conseguimos rodá-lo pela CLI do Mikrotik por meio do comando `system script run nome_do_script`.
+
+---
 
 ## Quantidade de Leases DHCP por Interface
 ```python
@@ -57,12 +68,42 @@ Você deverá salvar o script abaixo em *System -> Scripts*. Nomeie como `monito
 Vamos usar dois itens, um item normal, que irá executar o script e receber o retorno de todas as entradas e um item de descoberta automática dependente, que para cada entrada irá criar um item de monitoramento.
 
 Para o item mestre, configure como a imagem abaixo:
+![zbx4-img1](/images/zbx4-img1.png)
+- **Nome:** Item Mestre - Monitoramento DHCP
+- **Tipo:** Agente SSH
+- **Chave:** ssh.run[monitoramento_dhcp,,,,]
+- **Método de autenticação:** Senha
+- **Nome do usuário:** conforme sua estrutura
+- **Senha:** conforme sua estrutura
+- **Script executado:** `/system script run monitoramento_dhcp`
+- **Intervalo de atualização:** 5m
 
+Para a descoberta automática, configure conforme a imagem abaixo:
+![zbx4-img4](/images/zbx4-img4.png)
+- **Nome:** Descoberta Clientes DHCP
+- **Tipo:** Item dependente
+- **Chave:** descoberta.clientes.dhcp
+- **Item mestre:** Item Mestre - Monitoramento DHCP
 
+Clique em Macros e preencha com os valores de chaves identificadoras do script:
+![zbx4-img5](/images/zbx4-img5.png)
+- `{#INTERFACE}`: $.inteface
+- `{#SERVIDOR}`: $.servidor
 
+Para o item, configure conforme imagem abaixo:
+![zbx4-img6](/images/zbx4-img6.png)
+- **Nome:** \{\#INTERFACE\}(\{\#SERVIDOR\}) - Quantidade de Leases
+- **Tipo:** Item dependente
+- **Chave:** dhcp.lease.[\{\#SERVIDOR\}]
+- **Tipo de informação:** Numérico (inteiro sem sinal)
+- **Item mestre:** Item Mestre - Monitoramento DHCP
+
+Clique em pré-processamento e vamos adicionar uma regra de JsonPath conforme texto abaixo:
+![zbx4-img7](/images/zbx4-img7.png)
 ```js
 $.data[?(@.interface == '{#INTERFACE}')].dados.leases.first()
 ```
+
 ---
 
 ## Quantidade de sessões PPPoE por Interface
@@ -90,6 +131,39 @@ $.data[?(@.interface == '{#INTERFACE}')].dados.leases.first()
 :put "] }\n";
 ```
 
+### Configuração do item no Zabbix
+Para o item mestre, configure como a imagem abaixo:
+![zbx4-img2](/images/zbx4-img2.png)
+- **Nome:** Item Mestre - Monitoramento PPPoE
+- **Tipo:** Agente SSH
+- **Chave:** ssh.run[monitoramento_pppoe,,,,]
+- **Método de autenticação:** Senha
+- **Nome do usuário:** conforme sua estrutura
+- **Senha:** conforme sua estrutura
+- **Script executado:** `/system script run monitoramento_pppoe`
+- **Intervalo de atualização:** 5m
+
+Para a descoberta automática, configure conforme a imagem abaixo:
+![zbx4-img8](/images/zbx4-img8.png)
+- **Nome:** Descoberta Servidores PPPoE
+- **Tipo:** Item dependente
+- **Chave:** descoberta.servidores.pppoe
+- **Item mestre:** Item Mestre - Monitoramento PPPoE
+
+Clique em Macros e preencha com os valores de chaves identificadoras do script:
+![zbx4-img9](/images/zbx4-img9.png)
+- `{#SERVIDOR}`: $.servidor
+
+Para o item, configure conforme imagem abaixo:
+![zbx4-img10](/images/zbx4-img10.png)
+- **Nome:** \{\#SERVIDOR\} - Clientes Ativos
+- **Tipo:** Item dependente
+- **Chave:** pppoe.ativos.[\{\#SERVIDOR\}]
+- **Tipo de informação:** Numérico (inteiro sem sinal)
+- **Item mestre:** Item Mestre - Monitoramento PPPoE
+
+Clique em pré-processamento e vamos adicionar uma regra de JsonPath conforme texto abaixo:
+![zbx4-img11](/images/zbx4-img11.png)
 ```js
 $.data[?(@.servidor== '{#SERVIDOR}')].dados.clientesAtivos.first()
 ```
@@ -124,6 +198,42 @@ $.data[?(@.servidor== '{#SERVIDOR}')].dados.clientesAtivos.first()
 :put "] }\n";
 
 ```
+
+### Configuração do item no Zabbix
+
+Para o item mestre, configure como a imagem abaixo:
+![zbx4-img3](/images/zbx4-img3.png)
+- **Nome:** Item Mestre - Monitoramento OSPF
+- **Tipo:** Agente SSH
+- **Chave:** ssh.run[monitoramento_ospf,,,,]
+- **Método de autenticação:** Senha
+- **Nome do usuário:** conforme sua estrutura
+- **Senha:** conforme sua estrutura
+- **Script executado:** `/system script run monitoramento_ospf`
+- **Intervalo de atualização:** 5m
+
+Para a descoberta automática, configure conforme a imagem abaixo:
+![zbx4-img12](/images/zbx4-img12.png)
+- **Nome:** Descoberta Neighbors OSPF
+- **Tipo:** Item dependente
+- **Chave:** descoberta.neighbors.ospf
+- **Item mestre:** Item Mestre - Monitoramento OSPF
+
+Clique em Macros e preencha com os valores de chaves identificadoras do script:
+![zbx4-img13](/images/zbx4-img13.png)
+- `{#ADDRESS}`: $.address
+- `{#ROUTER_ID}`: $.router_id
+
+Para o item, configure conforme imagem abaixo:
+![zbx4-img14](/images/zbx4-img14.png)
+- **Nome:** \{\#ROUTER_ID\}(\{\#ADDRESS\}) - Estado da Sessão
+- **Tipo:** Item dependente
+- **Chave:** ospf.state.[\{\#ROUTER_ID\}.\{\#ADDRESS\}]
+- **Tipo de informação:** Numérico (inteiro sem sinal)
+- **Item mestre:** Item Mestre - Monitoramento OSPF
+
+Clique em pré-processamento e vamos adicionar uma regra de JsonPath conforme texto abaixo:
+![zbx4-img16](/images/zbx4-img15.png)
 
 ```js
 $.data[?(@.router_id == '{#ROUTER_ID}' && @.address == '{#ADDRESS}')].dados.status.first()

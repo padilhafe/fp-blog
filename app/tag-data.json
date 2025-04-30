@@ -1,5 +1,6 @@
 {
   "zabbix": 5,
+  "mikrotik": 1,
   "linux": 1,
   "virtualizacao": 1
 }

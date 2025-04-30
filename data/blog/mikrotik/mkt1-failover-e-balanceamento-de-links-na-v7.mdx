@@ -1,0 +1,257 @@
+---
+title: 'Configuração FailOver e LoadBalance no Mikrotik v7 - Parte I' 
+date: '2025-03-07'
+tags: ['mikrotik']
+draft: false
+summary: Este artigo demonstra como configurar FailOver via Roteamento Recursivo
+---
+
+## Índice
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Entendendo o Laboratório](#entendendo-o-laboratório)
+- [Rota Default e Roteamento Recursivo](#rota-default-e-roteamento-recursivo)
+  - [Problema: Interface ativa, mas sem internet](#problema-interface-ativa-ip-funcionando-mas-sem-internet)
+  - [Problema: Interface ativa, IP funcionando, mas sem internet](#problema-interface-ativa-mas-sem-internet)
+- [Configurações](#configurações)
+- [Parte II - Balanceamento PCC]()
+---
+
+## Introdução
+Neste artigo, vamos abordar duas das técnicas mais importantes e utilizadas para garantir alta disponibilidade e desempenho em conexões WAN: o **failover recursivo** e o **balanceamento de carga via PCC** (Per Connection Classifier).
+
+O roteamento recursivo permite que o MikroTik identifique falhas no link principal de forma inteligente, redirecionando o tráfego automaticamente para uma rota de backup. Já o PCC, por sua vez, oferece uma abordagem capaz de distribuir conexões entre múltiplos links, mesmo quando possuem velocidades ou capacidades diferentes.
+
+Esse artigo é essencial para quem busca entender como manter a estabilidade da conexão em ambientes com múltiplos links, além de otimizar o uso da largura de banda disponível. Seja para um pequeno escritório ou para um ambiente de ISP, as técnicas demonstradas aqui são amplamente aplicáveis.
+
+### Link para o tutorial em vídeo
+<YouTube id="sfKG8Kb1zFE"/>
+
+---
+
+## Entendendo o Laboratório
+Para demonstrar na prática as técnicas de failover recursivo e balanceamento PCC, utilizaremos um ambiente simulado composto por múltiplos roteadores que representam elementos comuns em uma rede de acesso à Internet.
+
+A topologia é formada pelos seguintes equipamentos:
+- **Dois roteadores simulando provedores de Internet (ISP1 e ISP2):** responsáveis por fornecer os links WAN que serão utilizados no balanceamento e failover.
+- **Um roteador "core" da rede:** centraliza o roteamento interno e será o ponto de decisão para o tráfego de saída, aplicando as lógicas de roteamento recursivo e PCC.
+- **Um roteador BNG (Broadband Network Gateway):** atua como ponto de autenticação e atribuição de IPs aos clientes, fornecendo serviços como PPPoE e DHCP.
+- **Dois clientes finais:** um cliente será configurado com autenticação PPPoE e o outro com atribuição dinâmica via DHCP, permitindo validar o comportamento do tráfego através das regras aplicadas no core.
+
+Essa estrutura simula de forma fiel um ambiente de pequeno provedor ou rede corporativa com múltiplos links e diferentes formas de acesso, proporcionando um cenário ideal para testar e entender o comportamento das técnicas apresentadas.
+
+Cada roteador ISP terá os endereços 8.8.8.8 e 8.8.4.4 configurados em suas loopbacks para simular o ping ao Google (assim não é necessário configurar conectividade externa no laboratório).
+
+Ao final da página você irá encontrar as [base configs](#base-configs), que são as configurações iniciais que cada roteador precisa ter para seguir este artigo.
+
+---
+
+## Rota Default e Roteamento Recursivo
+A rota default (ou rota padrão) é uma instrução usada pelo roteador para saber para onde enviar o tráfego destinado a redes desconhecidas, ou seja, que não estão listadas na tabela de roteamento.
+
+No MikroTik (e em redes em geral), a rota default é representada pelo destino 0.0.0.0/0, e é comumente usada para encaminhar tráfego de saída para a Internet.
+
+
+Em nosso laboratório, temos dois links WAN:
+- ISP1: 200.200.1.1 via ether1
+- ISP2: 200.200.2.1 via ether2
+
+No roteador CORE, adicionamos duas rotas default apontando para cada ISP:
+```
+/ip route
+add dst-address=0.0.0.0/0 gateway=200.200.1.1 distance=1 comment="Rota principal via ISP1"
+add dst-address=0.0.0.0/0 gateway=200.200.2.1 distance=2 comment="Backup via ISP2"
+```
+
+**Por que usamos distâncias diferentes?**
+A distância administrativa (ou AD — Administrative Distance) é um valor numérico que indica a preferência de uma rota. Quanto menor o valor, maior a prioridade daquela rota na tabela de roteamento.
+
+Neste exemplo:
+- A rota via ISP1 tem distance=1 ⇒ será preferida.
+- A rota via ISP2 tem distance=2 ⇒ será usada apenas se a rota via ISP1 estiver indisponível (failover).
+
+Isso é essencial em cenários de alta disponibilidade (HA), pois evita que o roteador tente usar simultaneamente dois caminhos para o mesmo destino de forma não controlada. Ao fazer isso, garantimos que:
+- O tráfego sai sempre pela rota principal (ISP1),
+- E somente em caso de falha ele redireciona para a rota de backup (ISP2).
+
+### Problema: Interface ativa, mas sem internet
+Quando configuramos duas rotas default com distâncias diferentes o MikroTik entende que deve sempre usar a rota com menor distância — no caso, a via ISP1.
+
+Por padrão, ele só remove essa rota da tabela se a interface física cair (por exemplo, se o cabo for desconectado).
+
+Porém, se o problema for externo — como uma falha no roteador do provedor, perda de rota default no ISP ou problemas no backbone — a interface permanece "up", e o MikroTik continua tentando usar um caminho que está inoperante.
+
+Desative o IP da interface ether1 do ISP1 e verifique a tabela de rotas do **Core**:
+![mkt1-img1](/images/mkt1-img1.png)
+![mkt1-img2](/images/mkt1-img2.png)
+
+Devido a configuração de rota estar totalmente estática, a menos que seja desativado a rota default do ISP1, nossos clientes não irão conseguir navegar mais, por mais que temos dois links de internet disponíveis.
+
+**Solução Básica: Regras de CheckGateway**
+O parâmetro check-gateway permite que o roteador verifique a conectividade real com o próximo salto (gateway), mesmo que a interface física continue ativa. Execute os comandos abaixo no roteador de **Core** mantendo o IP da inteface ether1 do ISP1 desativado.
+```
+/ip route
+set 0 dst-address=0.0.0.0/0 gateway=200.200.1.1 distance=1 check-gateway=ping comment="Rota principal via ISP1 com verificação"
+set 1 dst-address=0.0.0.0/0 gateway=200.200.2.1 distance=2 comment="Backup via ISP2"
+```
+
+Perceba que nossa rota pelo ISP2 passou a ser ativa agora:
+![mkt1-img3](/images/mkt1-img3.png)
+
+E ao ativar o IP do ISP1, devido a menor distância a rota por ele volta a ser ativa:
+![mkt1-img4](/images/mkt1-img4.png)
+
+Isso já salva a vida caso aconteça algum problema em um horário ruim ou em um horário que não há ninguem para realizar a configuração manual, porém, ela ainda tem seus problemas.
+
+### Problema: Interface ativa, IP funcionando, mas sem internet
+Um dos problemas mais comuns em cenários com múltiplos links WAN é o seguinte:
+- A interface física do ISP continua ativa (ether1 está up).
+- O roteador do provedor responde ao ping, então check-gateway=ping não detecta falha.
+
+Porém, não há acesso real à Internet — por exemplo, uma rota upstream está quebrada no provedor ou houve perda de conectividade geral.
+
+> Nesse cenário, o MikroTik mantém a rota default ativa, mesmo que a navegação esteja impossível. O tráfego continua sendo roteado para um caminho sem saída real.
+
+Faça o teste, desative o endereço 8.8.8.8 do ISP1 e perceba que ele não é alcançável mais, pois não há uma lógica de comutação para o ISP2.
+
+**Solução: Roteamento Recursivo**
+
+O roteamento recursivo resolve esse problema com uma abordagem mais inteligente:
+a rota default só é considerada válida se for possível alcançar um destino específico da Internet, como o DNS público do Google.
+
+- Como funciona?
+Em vez de apontar diretamente para o IP do gateway do ISP, você cria uma rota default apontando para um IP público (ex: 8.8.8.8 ou 8.8.4.4), e depois diz ao roteador como chegar nesse IP.
+
+O MikroTik verifica a rota para esse IP público, e só mantém a rota default ativa se for possível chegar até ele.
+```
+/ip route
+set 0 dst-address=0.0.0.0/0 gateway=8.8.8.8 distance=1 check-gateway=ping scope=30 target-scope=11 comment="Default via ISP1 com validação recursiva"
+set 1 dst-address=0.0.0.0/0 gateway=8.8.4.4 distance=2 check-gateway=ping scope=30 target-scope=11 comment="Default via ISP2 com validação recursiva"
+
+add dst-address=8.8.8.8 gateway=200.200.1.1 distance=1 scope=10 target-scope=10 comment="Rota de verificação ISP1"
+add dst-address=8.8.4.4 gateway=200.200.2.1 distance=1 scope=10 target-scope=10 comment="Rota de verificação ISP2"
+```
+
+Se você desativou o 8.8.8.8, você irá perceber de cara que o ISP2 é a rota ativa:
+![mkt1-img5](/images/mkt1-img5.png)
+
+E ao ativar o 8.8.8.8 no ISP1 novamente, temos a comutação da rota defualt para ele.
+![mkt1-img6](/images/mkt1-img6.png)
+
+Na parte II deste tutorial, vamos verificar como realizamos o balanceamento de carga PCC.
+
+---
+
+## Configurações
+**ISP1**
+```
+/system identity set name=ISP1
+
+/interface ethernet
+set [find default-name=ether1] comment="Link para CORE"
+
+/interface bridge
+add name=lo
+
+/ip address
+add address=200.200.1.1/30 interface=ether1 network=200.200.1.0
+add address=8.8.8.8/32 interface=lo
+add address=8.8.4.4/32 interface=lo
+```
+
+**ISP2**
+```
+/system identity set name=ISP2
+
+/interface ethernet
+set [find default-name=ether1] comment="Link para CORE"
+
+/interface bridge
+add name=lo
+
+/ip address
+add address=200.200.2.1/30 interface=ether1 network=200.200.2.0
+add address=8.8.8.8/32 interface=lo
+add address=8.8.4.4/32 interface=lo
+```
+
+**Core**
+```
+/system identity set name=CORE
+
+/interface ethernet
+set [find default-name=ether1] comment="Conexão com ISP1"
+set [find default-name=ether2] comment="Conexão com ISP2"
+set [find default-name=ether3] comment="Rede interna para BNG"
+
+/ip address
+add address=200.200.1.2/30 interface=ether1 network=200.200.1.0
+add address=200.200.2.2/30 interface=ether2 network=200.200.2.0
+add address=192.168.3.1/24 interface=ether3 network=192.168.3.0
+
+/ip route
+add dst-address=172.16.0.0/24 gateway=192.168.3.2
+add dst-address=10.0.0.0/24 gateway=192.168.3.2
+
+/ip firewall nat
+add chain=srcnat out-interface=ether1 action=masquerade
+add chain=srcnat out-interface=ether2 action=masquerade 
+```
+
+**BNG**
+```
+/system identity set name=BNG
+
+/interface ethernet
+set [find default-name=ether1] comment="Conexão com CORE (rede interna)"
+set [find default-name=ether2] comment="Interface de autenticação PPPoE"
+set [find default-name=ether3] comment="Rede local dos clientes DHCP"
+
+/ip address
+add address=192.168.3.2/24 interface=ether1 network=192.168.3.0
+add address=172.16.0.1/24 interface=ether3 network=172.16.0.0
+
+/ip route
+add gateway=192.168.3.1
+
+/ip pool
+add name=dhcp_pool ranges=172.16.0.10-172.16.0.100
+add name=pppoe_pool ranges=10.0.0.10-10.0.0.100
+
+/ppp profile
+add name=pppoe_profile local-address=10.0.0.1 remote-address=pppoe_pool
+
+/ppp secret
+add name=cliente1 password=123456 service=pppoe profile=pppoe_profile
+
+/interface pppoe-server server
+add interface=ether2 service-name=pppoe-server default-profile=pppoe_profile disabled=no
+
+/ip dhcp-server
+add name=dhcp_srv interface=ether3 address-pool=dhcp_pool disabled=no
+
+/ip dhcp-server network
+add address=172.16.0.0/24 gateway=172.16.0.1 dns-server=8.8.8.8 comment="Rede DHCP para clientes"
+```
+
+**Cliente PPPoE**
+```
+/system identity set name=Cliente-PPPoE
+
+/interface ethernet
+set [find default-name=ether1] comment="Conexão com BNG (PPPoE)"
+
+/interface pppoe-client
+add name=pppoe-out1 interface=ether1 user=cliente1 password=123456 disabled=no use-peer-dns=yes add-default-route=yes
+```
+
+**Cliente DHCP**
+```
+/system identity set name=Cliente-DHCP
+
+/interface ethernet
+set [find default-name=ether1] comment="Conexão com BNG (DHCP)"
+
+/ip dhcp-client
+add interface=ether1 use-peer-dns=yes use-peer-ntp=yes add-default-route=yes
+```

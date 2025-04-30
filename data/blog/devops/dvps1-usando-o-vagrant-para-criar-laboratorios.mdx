@@ -1,0 +1,177 @@
+---
+title: 'Usando o Vagrant para criar laboratórios virtuais'
+date: '2025-04-30'
+tags: ['devops', 'vagrant']
+draft: false
+summary: 
+---
+
+## Índice
+- [Introdução](#introdução)
+  - [Requisitos](#requisitos)
+- [Instalação do Vagrant](#instalação-do-vagrant)
+  - [macOS](#macos)
+  - [Linux](#linux-debianubuntu)
+  - [Windows](#windows)
+- [Vagrantfiles](#vagrantfiles)
+- [Comandos Básicos](#comandos-básicos)
+
+---
+
+## Introdução
+O Vagrant é uma ferramenta de automação criada para facilitar o provisionamento de ambientes virtuais consistentes. Com ele, você pode criar, destruir e versionar máquinas virtuais com apenas alguns comandos e um simples arquivo de configuração (Vagrantfile).
+
+Em um cenário técnico — especialmente para profissionais de redes, DevOps e desenvolvimento — o Vagrant é uma mão na roda para:
+- Criar laboratórios locais rápidos;
+- Garantir que o ambiente de testes ou desenvolvimento seja idêntico ao ambiente de produção;
+- Padronizar ambientes entre equipes;
+- Integrar com ferramentas como Ansible em pipelines de automação.
+
+### Requisitos
+Antes de instalar o Vagrant, você precisa garantir que alguns pacotes estejam disponíveis no seu sistema:
+
+1. Python
+Dependência para o VirtualBox que será o hipervisor que vamos utilizar para criação dos laboratórios virutais com o Vagrant.
+> É possível usar muitos outros hipervisores junto do Vagrant, incluindo o VMware Workstation Pro, porém, no dia a dia percebo que é muito mais simples e prático o combo VirtualBox + Vagrant.
+
+2. Python Windows 32 API
+Caso esteja utilizando Windows, após a instalação do Python será necessário indtalar uma biblioteca que o VirtualBox utiliza, abra o CMD e digite: `python -m pip install pywin32`.
+
+3. VirtualBox
+O VirtualBox será o provedor de virtualização padrão utilizado para criar as VMs. É possível baixá-lo diretamente do [site oficial](https://www.virtualbox.org/wiki/Downloads).
+
+---
+
+## Instalação do Vagrant
+
+As instruções de instalação se encontram diretamente no [site do Vagrant](https://developer.hashicorp.com/vagrant/install), estou apenas reproduzindo os comandos citados na página.
+
+### macOS
+```sh
+brew tap hashicorp/tap
+brew install hashicorp/tap/hashicorp-vagrant
+```
+> Se você utiliza macOS com chips M (arquitetura ARM), pode não ser possível seguir todos os passos descritos neste artigo sem antes ajustar alguns comandos, nem todas as imagens estão disponíveis fora da arquitetura x86.
+
+### Linux (Debian/Ubuntu)
+```sh
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install vagrant
+```
+> Não é possível utilizar o WSL para instalação do Vagrant, pois, ele precisa se comunicar diretamente com o processo do VirtualBox que roda no hospedeiro Windows.
+
+### Windows
+Por favor, acesse a [página de download](https://developer.hashicorp.com/vagrant/install#windows) do Vagrant para baixar o executável da última versão disponível.
+
+O processo de instalação é simples, após executar o instalador, marque a caixa concordando com os termos e a licençca e clique no botão **Install**.
+![dvps1-img1](/images/dvps1-img1.png)
+
+Aguarde enquanto o Vagrant realiza a instalação da aplicação, pode levar alguns minutos.
+![dvps1-img2](/images/dvps1-img2.png)
+
+E pronto, o Vagrant já está instalado.
+![dvps1-img3](/images/dvps1-img3.png)
+
+É necessário reiniciar a máquina antes de começar usar o Vagrant, caso contrário, ele pode apresentar erros.
+![dvps1-img4](/images/dvps1-img4.png)
+
+---
+
+## Vagrantfiles
+O Vagrantfile é um arquivo de configuração que define como a máquina virtual será criada, configurada, provisionada e conectada. Ele é escrito em Ruby, mas o Vagrant fornece uma DSL (Domain Specific Language) simplificada — você não precisa ser programador Ruby para usá-lo.
+
+A sua estrutura base é assim:
+```ruby
+Vagrant.configure("2") do |config|
+  # configurações vão aqui
+end
+```
+
+`Vagrant.configure("2") do |config|`
+
+Esse bloco indica que estamos usando a versão 2 da sintaxe do Vagrantfile, que é a mais atual e estável. O objeto config é usado para referenciar as opções de configuração que vamos aplicar.
+
+### Componentes principais do Vagrantfile
+1. `config.vm.box`
+```ruby
+config.vm.box = "ubuntu/jammy64"
+```
+
+Define a box base (imagem do sistema operacional). Ao rodar vagrant up, o Vagrant faz o download da box e a usa como base da VM. Você pode usar boxes públicas do [Vagrant Cloud](https://portal.cloud.hashicorp.com/vagrant/discover).
+> Se você estiver usando macOS com processadores ARM, procure por boxes que suporte a arquitetura.
+
+2. `config.vm.hostname`
+```ruby
+config.vm.hostname = "lab-vm"
+```
+
+Define o hostname da máquina virtual (exibido, por exemplo, no prompt do shell dentro da VM).
+
+3. `config.vm.network`
+```ruby
+config.vm.network "public_network", type: "dhcp"
+```
+Configura o tipo de rede da VM. Pode ser:
+- public_network: conecta a VM à rede física (modo bridge)
+- private_network: cria uma rede interna (sem acesso à internet)
+- forwarded_port: encaminha uma porta do host para a VM
+
+Exemplo com IP fixo:
+```ruby
+config.vm.network "public_network", ip: "192.168.56.10"
+```
+
+4. `config.vm.provider`
+```ruby
+config.vm.provider "virtualbox" do |vb|
+  vb.memory = "1024"
+  vb.cpus = 2
+  vb.name = "lab-vm"
+end
+```
+
+Configura o provider — neste caso, o VirtualBox — que será usado para rodar a VM. Aqui você define os recursos de hardware e outras configurações inerentes ao VirtualBox:
+- memory: quantidade de RAM (em MB)
+- cpus: núcleos de CPU
+- name: nome da VM na interface do VirtualBox
+> Outros providers possíveis: vmware_desktop, hyperv, docker, etc.
+
+5. `config.vm.provision`
+```ruby
+config.vm.provision "shell", inline: <<-SHELL
+  apt update
+  apt install -y nginx
+SHELL
+```
+
+Provisiona a VM com scripts inline ou arquivos externos. Pode ser shell, ansible, puppet, chef, etc. No trecho acima, rodamos um script bash logo após a VM estar criada — útil para instalar pacotes, configurar serviços, etc.
+
+**Exemplo com o arquivo completo**
+```ruby
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.hostname = "lab-vm"
+  config.vm.network "public_network", type: "dhcp"
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "1024"
+    vb.cpus = 2
+    vb.name = "lab-vm"
+  end
+  config.vm.provision "shell", inline: <<-SHELL
+    apt update
+    apt install -y nginx
+    SHELL
+end
+```
+
+## Comandos básicos
+- vagrant init → cria o Vagrantfile básico
+- vagrant validate → valida se o Vagrantfile contém erros de sintaxe
+- vagrant up → lê o Vagrantfile, baixa a box e cria a VM
+- vagrant status → imprime na tela o estado da máquina
+- vagrant ssh → conecta à VM via SSH
+- vagrant halt → desliga a VM
+- vagrant destroy → remove a VM completamente
+
+Com exceção do comando `vagrant init` que é responsável por criar um arquivo Vagrantfile de exemplo, os outros comandos devem ser executados em um diretório que contem um Vagrantfile válido.

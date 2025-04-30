@@ -1,0 +1,122 @@
+---
+title: 'Configuração FailOver e Balanceamento de Links no Mikrotik v7 - Parte II'
+date: '2025-03-08'
+tags: ['mikrotik']
+draft: false
+summary: Este artigo demonstra como configurar o balanceamento de Links PCC
+---
+
+## Índice
+- [Parte I - Rota Default e Roteamento Recursivo](https://felipepadilha.com.br/blog/mikrotik/mkt1-failover-e-balanceamento-de-links-na-v7)
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Configuração do PCC](#configuração-do-pcc)
+
+---
+
+## Introdução
+Não deixe de conferir a [Parte I](https://felipepadilha.com.br/blog/mikrotik/mkt1-failover-e-balanceamento-de-links-na-v7) para ter acesso a configuração base dos laboratórios.
+
+O balanceamento de carga via PCC (Per Connection Classifier) é uma técnica que permite distribuir as conexões de saída entre múltiplos links WAN, com base em critérios como endereço IP de origem, destino, porta, ou combinações desses fatores.
+
+Diferente de técnicas simples de failover, o PCC mantém os dois links ativos simultaneamente, permitindo um uso mais eficiente da banda disponível, mesmo quando os links têm velocidades ou operadoras diferentes.
+
+O principal objetivo do PCC é garantir que cada conexão (TCP/UDP) seja mantida sempre pelo mesmo caminho — isso evita problemas com sessões persistentes, como logins, streaming, e serviços bancários, que costumam "quebrar" quando uma conexão muda de rota no meio da comunicação.
+
+**Quando usar PCC?**
+- Quando você deseja somar a capacidade de múltiplos links.
+- Quando os links têm capacidades diferentes e você quer controlar a proporção de uso.
+
+**Remover configurações do laboratório passado**
+Se você está acompanhando desde a primeira parte, precisamos remover a configuração de roteamento recursivo:
+```
+/ip route
+remove 0,1,2,3
+```
+
+### Link para o tutorial em vídeo
+<YouTube id="sfKG8Kb1zFE"/>
+
+---
+
+## Configuração do PCC
+O PCC (Per Connection Classifier) é uma técnica de balanceamento de carga que atua no nível de conexão e não por pacote. Isso significa que cada nova conexão é "classificada" para seguir por um dos links WAN disponíveis, e todos os pacotes daquela conexão seguirão sempre pelo mesmo caminho. Isso evita problemas com sessões que exigem persistência de rota, como acesso a bancos, sites com autenticação, serviços em nuvem, entre outros.
+
+A lógica do PCC está dividida em:
+- Criação de tabelas de roteamento separadas
+- Rotas associadas a cada tabela
+- Marcação de conexões e rotas com Mangle
+- Distribuição das conexões via per-connection-classifier
+
+O primeiro passo é criar tabelas FIB (Forwarding Information Base) distintas para cada link WAN. Essas tabelas permitirão que o MikroTik aplique políticas de roteamento específicas conforme a marca atribuída à conexão.
+```
+/routing/table
+add name=ISP1 fib
+add name=ISP2 fib
+```
+
+Em seguida, definimos as rotas padrão (0.0.0.0/0) para cada uma dessas tabelas, além de rotas na tabela principal para cenários de tráfego não marcado.
+```
+/ip route
+add gateway=200.200.1.1 routing-table=ISP1 check-gateway=ping comment="Rota ISP1"
+add gateway=200.200.2.1 routing-table=ISP2 check-gateway=ping comment="Rota ISP2"
+add gateway=200.200.1.1 distance=1 check-gateway=ping comment="Rota principal ISP1"
+add gateway=200.200.2.1 distance=2 check-gateway=ping comment="Rota secundária ISP2"
+```
+
+E marcamos as conexões que entram por cada ISP:
+```
+/ip firewall mangle
+add chain=prerouting in-interface=ether1 connection-state=new connection-mark=no-mark \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1 comment="Marca conexões que entram pelo ISP1"
+
+add chain=prerouting in-interface=ether2 connection-state=new connection-mark=no-mark \
+    action=mark-connection new-connection-mark=CONEXAO_ISP2 comment="Marca conexões que entram pelo ISP2"
+```
+
+E com base nas marcas de conexão de cada pacote, aplicamos a marcação de rota:
+```
+/ip firewall mangle
+add chain=output connection-mark=CONEXAO_ISP1 action=mark-routing new-routing-mark=ISP1 \
+    comment="Aplica rota ISP1 a conexões marcadas"
+
+add chain=output connection-mark=CONEXAO_ISP2 action=mark-routing new-routing-mark=ISP2 \
+    comment="Aplica rota ISP2 a conexões marcadas"
+```
+
+E fazemos a distribuição de tráfego entre os provedores, no exemplo abaixo temos uma proporção de 80/20:
+```
+/ip firewall mangle
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:5/0 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1 comment="PCC ISP1 (80%)"
+
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:5/1 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1
+
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:5/2 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1
+
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:5/3 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1
+
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:5/4 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP2 comment="PCC ISP2 (20%)"
+```
+
+Perceba que temos 5 marcações totais, das quais 4 usam a `new-connection-mark` como *CONEXAO_ISP1* e apenas a última utiliza a *CONEXAO_ISP2*. Se eu quisesse fazer 50/50, bastariam apenas duas regras, uma mandando para cada conexão:
+```
+/ip firewall mangle
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:2/0 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP1 comment="PCC ISP1"
+
+add chain=prerouting in-interface=ether3 connection-state=new connection-mark=no-mark \
+    dst-address-type=!local per-connection-classifier=src-address-and-port:2/1 \
+    action=mark-connection new-connection-mark=CONEXAO_ISP2 comment="PCC ISP2"
+```
+

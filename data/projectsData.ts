@@ -16,7 +16,7 @@ const projectsData: Project[] = [
     title: 'Zabbix',
     description: `Série gratuita que ensina desde a instalação até monitoramentos avançados via SNMP e scripts personalizados.`,
     imgSrc: '/static/images/zabbix.png',
-    href: 'https://felipepadilha.com.br/series/gpon',
+    href: 'https://felipepadilha.com.br/series/zabbix',
   }
 ]
 

@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'Blog do Felipe Padilha',
   author: 'Felipe Padilha',
   headerTitle: 'Felipe Padilha',
-  description: 'Seu blog sobre tecnologia, infraestrutura e automação de redes.',
+  description: 'Seu blog sobre tecnologia, infraestrutura e automação de redes de computadores.',
   language: 'pt-br',
   theme: 'system', // system, dark or light
   siteUrl: 'https://felipepadilha.com.br',

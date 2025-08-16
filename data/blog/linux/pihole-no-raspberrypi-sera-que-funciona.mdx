@@ -1,0 +1,80 @@
+---
+title: 'Minha Primeira Experiência com o PiHole - Será que Funciona?'
+date: '2025-08-16'
+tags: ['linux']
+draft: false
+summary: Neste artigo compartilho minha primeira experiência instalando e testando o Pi-hole em um Raspberry Pi. A ideia foi transformar o pequeno computador em um servidor DNS caseiro capaz de bloquear anúncios, sites e rastreadores em todos os dispositivos conectados à rede. Explico o que é o Pi-hole, como funciona na prática e mostro o passo a passo da instalação. Se você busca mais privacidade, velocidade de navegação e uma internet sem propagandas, esse teste pode ser o ponto de partida ideal.
+---
+
+## Índice
+
+- [Índice](#índice)
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Afinal, o que é o PiHole?](#afinal-o-que-é-o-pihole)
+- [Como Instalar](#como-instalar)
+- [Primeiro Acesso e Configurações Iniciais](#primeiro-acesso-e-configurações-iniciais)
+- [Outras coisas que eu ativei:](#outras-coisas-que-eu-ativei)
+  - [DNS](#dns)
+  - [DHCP](#dhcp)
+  - [2FA](#2fa)
+
+## Introdução
+
+Sempre ouvi falar do PiHole como servidor DNS capaz de aumentar a privacidade e segurança de uma rede, mas nunca cheguei a testá-lo. Bem, eis que finalmente chegou o dia e decidi configurá-lo como servidor DNS da minha rede doméstica. Será que ele funciona tão bem quanto eu houvi falar ao longo dos anos?
+
+### Link para o tutorial em vídeo
+
+<YouTube id="Sot2MIKqDjk" />
+
+## Afinal, o que é o PiHole?
+
+O Pi-hole é um software livre e de código aberto criado para atuar como um servidor DNS com bloqueio de anúncios em toda a rede. Diferente de extensões de navegador, ele trabalha de forma centralizada: qualquer dispositivo conectado ao roteador (computadores, celulares, smart TVs, videogames) passa a ter os anúncios e rastreadores bloqueados automaticamente.
+
+Ele funciona como um DNS recursivo com filtro, verificando se o domínio solicitado faz parte de listas de bloqueio antes de encaminhar a consulta para os servidores DNS da sua escolha (como Cloudflare, Google ou Quad9). Além disso, oferece um painel web intuitivo que permite acompanhar estatísticas em tempo real, configurar listas personalizadas e até usar funções de DHCP.
+
+Por ser leve e versátil, o Pi-hole pode ser utilizado em um Raspberry Pi, mas também pode ser instalado em servidores Linux, containers Docker e até em ambientes de nuvem. A proposta é simples: mais privacidade, menos anúncios, mais segurança e uma internet mais rápida para todos os dispositivos da sua rede.
+
+## Como Instalar
+
+O processo de instalação é muito simples. Ele é feito por meio de um script que automatiza todas as configurações iniciais necessárias.
+
+## Primeiro Acesso e Configurações Iniciais
+
+## Outras coisas que eu ativei:
+
+### DNS
+
+Em **Settings -> DNS** ativando o modo _Expert_ é possível fazer o bind manual da interface de rede que deve responder as queries DNS, ou até mesmo limitar apenas para a rede local.
+![pihole1](/images/pihole1.png)
+
+Também é possível adicionar suporte a DNSSEC, para aumentar a segurança das respostas DNS, e também bloquear consultas reversas para a rede local.
+![pihole2](/images/pihole2.png)
+
+Também adicionei a consulta reversa de endereços IP para o meu servidor DHCP local, para que apareça os hostsnames na Dashboard ao invés dos endereços IP.
+![pihole3](/images/pihole3.png)
+
+O formato da configuração é: habilitado,endereço_ip,servidor,dominio:
+
+```sh
+true,192.168.10.0/24,192.168.10.254,localdomain.lan
+```
+
+> Acabou não funcionando, mas suspeito ser algo na Mikrotik, farei mais testes e irei atualizar o artigo!
+
+Outras configurações possíveis
+
+- Configurar _rate-limit_, para limitar clientes que realizam muitas consultas.
+- Alterar o domínio da rede local.
+- Adicionar mais servidores de upstream.
+
+### DHCP
+
+Não realizei a configuração ainda, pois minha rede tem diversas interfaces habilitadas como servidor DHCP, para diferentes redes. Mas assim que possível, atualizo um artigo com o retorno sobre o funcionamento ou não dessa opção.
+
+### 2FA
+
+O Pi-Hole tem suporte nativo a autenticação usando 2FA, configurei sem problemas meu aplicativo (Proton Authenticator) e agora preciso fornecer o código, junto da senha, para conseguir fazer login.
+![pihole4](/images/pihole4.png)
+
+Com certeza é uma configuração muito bem vinda para aumentar a segurança da rede local. A configuração fica localizada em **Settings -> Teleporter**.

@@ -39,7 +39,26 @@ Por ser leve e versátil, o Pi-hole pode ser utilizado em um Raspberry Pi, mas t
 
 O processo de instalação é muito simples. Ele é feito por meio de um script que automatiza todas as configurações iniciais necessárias.
 
+No servidor que será instalado, basta executar:
+
+```sh
+sudo apt update && sudo apt upgrade -y
+sudo apt install git -y
+
+git clone --depth 1 https://github.com/pi-hole/pi-hole.git Pi-hole
+
+cd "Pi-hole/automated install/"
+sudo bash basic-install.sh
+```
+
+E seguir o passo a passo da instalação. Qualquer dúvida basta acompnhar o vídeo, mas não tem segredo, é basicamente um _Next -> Next -> Next -> Finish_ "da vida".
+
 ## Primeiro Acesso e Configurações Iniciais
+
+Quando a instalação finaliza, ele informa na tela os dados de acesso:
+![pihole5](/images/pihole5.png)
+
+Você também pode alterar a senha por meio do comando: `pihole setpassword SUA_SENHA`. E pronto, está finalizado a instalação.
 
 ## Outras coisas que eu ativei:
 

@@ -36,12 +36,7 @@ export default function Home({ posts }) {
                       <div className="space-y-6">
                         <div>
                           <h2 className="text-2xl leading-8 font-bold tracking-tight">
-                            <Link
-                              href={`/blog/${slug}`}
-                              className="text-gray-900 dark:text-gray-100"
-                            >
-                              {title}
-                            </Link>
+                            <Link href={`/blog/${slug}`}>{title}</Link>
                           </h2>
                           <div className="flex flex-wrap">
                             {tags.map((tag) => (
@@ -54,11 +49,7 @@ export default function Home({ posts }) {
                         </div>
                       </div>
                       <div className="text-base leading-6 font-medium">
-                        <Link
-                          href={`/blog/${slug}`}
-                          className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
-                          aria-label={`Read more: "${title}"`}
-                        >
+                        <Link href={`/blog/${slug}`} aria-label={`Read more: "${title}"`}>
                           Ler mais &rarr;
                         </Link>
                       </div>
@@ -72,11 +63,7 @@ export default function Home({ posts }) {
       </div>
       {posts.length > MAX_DISPLAY && (
         <div className="flex justify-end text-base leading-6 font-medium">
-          <Link
-            href="/blog"
-            className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
-            aria-label="All posts"
-          >
+          <Link href="/blog" aria-label="All posts">
             Todos os Posts &rarr;
           </Link>
         </div>

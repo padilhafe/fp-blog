@@ -40,11 +40,7 @@ const Card = ({ title, description, imgSrc, href }) => (
         </h2>
         <p className="prose mb-3 max-w-none text-gray-500 dark:text-gray-400">{description}</p>
         {href && (
-          <Link
-            href={href}
-            className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 text-base leading-6 font-medium"
-            aria-label={`Link to ${title}`}
-          >
+          <Link href={href} aria-label={`Link to ${title}`}>
             Saber mais &rarr;
           </Link>
         )}

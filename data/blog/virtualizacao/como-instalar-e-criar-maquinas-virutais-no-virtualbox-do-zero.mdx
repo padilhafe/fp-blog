@@ -20,7 +20,6 @@ summary: Um guia prático que mostra passo a passo como instalar, configurar e g
   - [Pré-requisitos para o VirtualBox no Windows](#pré-requisitos-para-o-virtualbox-no-windows)
     - [1. Python](#1-python)
     - [2. Biblioteca pywin32](#2-biblioteca-pywin32)
-    - [3. Ativando o suporte à virtualização no Windows](#3-ativando-o-suporte-à-virtualização-no-windows)
   - [Instalação](#instalação)
 - [Gerenciando Máquinas Virtuais](#gerenciando-máquinas-virtuais)
   - [Removendo Máquinas Virtuais](#removendo-máquinas-virtuais)
@@ -202,24 +201,6 @@ pip install pywin32
 ```
 
 Ela habilita a comunicação entre o VirtualBox, o Python e os serviços do Windows.
-
-### 3. Ativando o suporte à virtualização no Windows
-
-No Windows 10/11 é necessário ativar a **Windows Hypervisor Platform (Plataforma de Hipervisor do Windows)**. Essa plataforma apenas expõe APIs que permitem ao VirtualBox usar as instruções de virtualização do processador.
-
-**Ativando via interface gráfica:**
-
-- Pesquise por _“Ativar ou desativar recursos do Windows”_.
-- Marque a opção **Plataforma de Hipervisor do Windows (Windows Hypervisor Platform)**.
-- Reinicie o computador.
-
-**Ativando via PowerShell (como Administrador):**
-
-```powershell
-Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All
-```
-
-> Outro detalhe importante é que você deve ativar o Intel VT-x ou AMD-V nas opções do processador na configuração da sua placa-mãe. Sem isso, a virtualização não funcionará corretamente, mesmo com as opções do Windows habilitadas.
 
 ## Instalação
 

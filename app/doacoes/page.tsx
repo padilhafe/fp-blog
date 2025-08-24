@@ -54,6 +54,10 @@ export default function DoacoesPage() {
               Para doações únicas e rápidas, use a chave Pix abaixo.
             </p>
             <CopyPix pixKey={pixKey} />
+            <p className="text-gray-700 dark:text-gray-300">
+              Dados bancários da chave Pix: Felipe Duellis Padilha, CPF: ***.949.649-**,
+              Instituição: Mercado Pago
+            </p>
           </div>
 
           <div className="border-t border-gray-200 pt-6 dark:border-gray-700">

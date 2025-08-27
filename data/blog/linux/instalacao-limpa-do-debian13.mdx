@@ -6,18 +6,23 @@ draft: false
 summary: Neste guia prático você aprende a realizar uma instalação limpa do Debian 13, desde o particionamento de disco até a configuração pós-instalação. O passo a passo mostra como escolher entre partição única, múltiplas partições ou LVM, além de ajustes importantes como atualização inicial, configuração de NTP, sudo e pacotes essenciais para servidores e desktops.
 ---
 
-## Índice
+# Índice
 
 - [Índice](#índice)
 - [Introdução](#introdução)
-  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
-- [Afinal, o que é o PiHole?](#afinal-o-que-é-o-pihole)
-- [Como Instalar](#como-instalar)
-- [Primeiro Acesso e Configurações Iniciais](#primeiro-acesso-e-configurações-iniciais)
-- [Outras coisas que eu ativei:](#outras-coisas-que-eu-ativei)
-  - [DNS](#dns)
-  - [DHCP](#dhcp)
-  - [2FA](#2fa)
+  - [Vídeo aula](#vídeo-aula)
+- [Instalação](#instalação)
+  - [Particionamento de disco](#particionamento-de-disco)
+    - [Instalação em partição única (Assistido - usar o disco inteiro)](#instalação-em-partição-única-assistido---usar-o-disco-inteiro)
+    - [Instalação com múltiplas partições (Manual)](#instalação-com-múltiplas-partições-manual)
+    - [Usando LVM (Logical Volume Manager)](#usando-lvm-logical-volume-manager)
+    - [Boas práticas](#boas-práticas)
+    - [Para o tutorial...](#para-o-tutorial)
+  - [Continuando a instalação](#continuando-a-instalação)
+- [Pós Instalação](#pós-instalação)
+  - [Configuração do NTP](#configuração-do-ntp)
+  - [Pacotes Padrão](#pacotes-padrão)
+    - [Ajustes no Bash](#ajustes-no-bash)
 
 # Introdução
 

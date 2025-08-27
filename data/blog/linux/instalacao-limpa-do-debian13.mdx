@@ -1,0 +1,414 @@
+---
+title: 'Instalação limpa do Debian 13'
+date: '2025-08-27'
+tags: ['linux']
+draft: false
+summary: Neste guia prático você aprende a realizar uma instalação limpa do Debian 13, desde o particionamento de disco até a configuração pós-instalação. O passo a passo mostra como escolher entre partição única, múltiplas partições ou LVM, além de ajustes importantes como atualização inicial, configuração de NTP, sudo e pacotes essenciais para servidores e desktops.
+---
+
+## Índice
+
+- [Índice](#índice)
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Afinal, o que é o PiHole?](#afinal-o-que-é-o-pihole)
+- [Como Instalar](#como-instalar)
+- [Primeiro Acesso e Configurações Iniciais](#primeiro-acesso-e-configurações-iniciais)
+- [Outras coisas que eu ativei:](#outras-coisas-que-eu-ativei)
+  - [DNS](#dns)
+  - [DHCP](#dhcp)
+  - [2FA](#2fa)
+
+# Introdução
+
+Talvez um aspecto muito menosprezado por muitos seja a instalação de um sistema operacional Linux. Mas essa é, com certeza, uma etapa de grande importância para o bom funcionamento do sistema, pois é nesse momento que realizamos o particionamento de discos de maneira segura. Um particionamento mal feito pode levar a problemas no futuro, incluindo a necessidade de reinstalação do sistema.
+
+E nada melhor do que um tutorial de instalação do sistema operacional para aproveitar que o Debian 13 acabou de sair do forno. Inclusive, se quiser ler as novidades que o sistema trouxe, pode acessar esta [página](https://www.debian.org/releases/trixie/release-notes/whats-new.pt.html) diretamente na documentação oficial.
+
+Você também pode usar este [link](https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/) para acessar a página de download. Baixe a ISO com o nome **debian-$VERSAO$-amd64-netinst.iso**. Agora, sem mais delongas, mãos à obra!
+
+> Neste tutorial, vou presumir que você já sabe usar o VirtualBox ou outro hipervisor para criar máquinas virtuais, ou tem disponibilidade para gravar a imagem em um pen drive e iniciar a instalação em uma máquina física.
+> Caso você queira saber mais sobre como criar máquinas virtuais com o VirtualBox, acesse este [artigo](https://felipepadilha.com.br/blog/virtualizacao/como-instalar-e-criar-maquinas-virutais-no-virtualbox-do-zero).
+
+## Vídeo aula
+
+A aula ainda não foi disponibilizada!
+
+> Mas você já pode conferir a apresentação [neste link](https://drive.proton.me/urls/MQKTTAFQTW#Ua9FNfhD328C).
+
+---
+
+# Instalação
+
+O primeiro passo da instalação é escolher entre o _Graphical Install_ e simplesmente o _Install_. Qual a diferença? No _Graphical Install_ você pode usar o mouse para clicar nas opções, pois há uma interface gráfica completa. Para este artigo, vou usar o _Graphical Install_, mas ambos oferecem exatamente as mesmas opções.
+![Tela de seleção do modo de Instalação do Debian 13 Trixie](/images/debian13-instalacao-00.png)
+
+Selecione o idioma _Portuguese (Brazil)_:
+![Tela de seleção de idiomas na instalação do Debian 13 Trixie](/images/debian13-instalacao-01.png)
+
+Selecione o local _Brasil_, isso garante que ele irá configurar o fuso-horário correto.
+![Tela de seleção de local na instalação do Debian 13 Trixie](/images/debian13-instalacao-02.png)
+
+No teclado, se estiver usando um teclado ABNT2 (padrão brasileiro, com tecla ç) mantenha marcado a opção _Português Brasileiro_, no meu caso que é um teclado americano, escolhi a opção _Inglês (Americano)_.
+![Tela de seleção do layout de teclado na instalação do Debian 13 Trixie](/images/debian13-instalacao-03.png)
+
+Neste momento, o instalador vai tentar configurar a rede automaticamente via **DHCP**.  
+Se houver um servidor DHCP na sua rede, o Debian já vai receber um endereço IP e seguir para a tela de configuração do **hostname**.
+![Tela de seleção do hostname na instalação do Debian 13 Trixie](/images/debian13-instalacao-04.png)
+
+Caso contrário, você verá uma mensagem informando que a configuração **falhou**. Nesse caso, basta voltar e escolher a opção de **configuração manual da rede**, onde você mesmo vai informar:
+
+- Endereço IP e máscara (em notação CIDR).
+- Gateway padrão da rede.
+- Servidores DNS (até três, separados por espaço).
+
+Se preferir, mesmo tendo recebido DHCP, você também pode optar por ignorar e configurar manualmente para ter mais controle sobre os endereços. Basta clicar no botão voltar e escolher a opção **Configurar a rede manualmente**.
+![debian-install-1](/images/debian13-instalacao-05.png)
+
+Informe o endereço IP e Prefixo de Rede (CIDR):
+![debian-install-1](/images/debian13-instalacao-06.png)
+
+Informe o endereço IP do Gateway da rede:
+![debian-install-1](/images/debian13-instalacao-07.png)
+
+Informe os servidores DNS da rede, separados por espaço, com limite de três servidores.
+![debian-install-1](/images/debian13-instalacao-08.png)
+
+Aqui adicionamos o hostname da máquina:
+![debian-install-1](/images/debian13-instalacao-09.png)
+
+E o domínio (pode deixar em branco se não tiver ou não souber):
+![debian-install-1](/images/debian13-instalacao-10.png)
+
+Configuramos a senha do usuário root:
+![debian-install-1](/images/debian13-instalacao-11.png)
+
+> Você também pode manter a senha do usuário root em branco, neste caso, o próprio instalador irá baixar o `sudo` e adicionar o usuário pessoal ao grupo.
+
+E iniciamos a criação de um novo usuário informando o nome completo:
+![debian-install-1](/images/debian13-instalacao-12.png)
+
+Criamos um nome de usuário para ele:
+![debian-install-1](/images/debian13-instalacao-13.png)
+
+E configuramos a senha também:
+![debian-install-1](/images/debian13-instalacao-14.png)
+
+Selecione o seu estado:
+![debian-install-1](/images/debian13-instalacao-15.png)
+
+## Particionamento de disco
+
+E chegamos ao particionamento de disco! Posso te garantir uma coisa: cada tutorial que você ler vai recomendar um método diferente e dificilmente encontrará consenso entre os SysAdmins (a gente é teimoso demais para isso). Portanto, vou explicar o que é particionar o disco, quais configurações você pode adotar e dar o conhecimento necessário para que **você** decida o que é melhor na sua situação específica.
+![[Pasted image 20250827142847.png]]
+
+### Instalação em partição única (Assistido - usar o disco inteiro)
+
+Para quem está começando ou deseja **facilidade de manutenção**, a opção mais simples é deixar o instalador criar apenas uma partição montada em / (raiz), além da partição de _swap_.
+Nesse caso:
+
+- **Vantagens:** instalação rápida, fácil de entender, menor chance de erro.
+- **Desvantagens:** se o disco encher, tanto arquivos pessoais quanto arquivos do sistema ficam comprometidos.
+
+Essa abordagem é recomendada para **servidores de aplicação, ambientes de laboratório ou desktops pessoais básicos**.
+
+### Instalação com múltiplas partições (Manual)
+
+Outra forma é dividir o disco em várias partições. As mais comuns são:
+
+- / (raiz): onde ficam os arquivos do sistema.
+- /home: diretório dos usuários.
+- /var: útil em servidores, pois guarda logs, cache de pacotes e arquivos temporários que podem crescer muito.
+- swap: espaço de troca quando a memória RAM não é suficiente.
+
+Separar partições ajuda na **segurança e estabilidade**, pois evita que logs ou arquivos de usuários encham o disco inteiro.
+
+Essa abordagem é comum em **servidores** e em ambientes que exigem maior controle sobre cada parte do sistema.
+
+### Usando LVM (Logical Volume Manager)
+
+O LVM é um gerenciador de volumes lógicos que permite criar partições “flexíveis”. Em vez de ficar preso ao tamanho definido na instalação, você pode **aumentar ou reduzir volumes** no futuro (desde que haja espaço livre no disco ou em discos adicionais).
+
+- **Vantagens:** flexibilidade para redimensionar partições, adicionar novos discos ao grupo de volumes e snapshots.
+- **Desvantagens:** um pouco mais complexo para iniciantes.
+
+Essa é a escolha ideal para **ambientes de produção**, **servidores** e quando se espera crescimento do sistema ao longo do tempo.
+
+### Boas práticas
+
+- Para **computadores pessoais e servidores de aplicação**, uma partição `/` única (mais swap) já resolve bem.
+- Caso queira uma maior segurança em **servidores**, separe pelo menos `/home`, `/boot`, `/tmp`, `/var/log/` e `/`.
+- Se for lidar com bancos de dados ou sistemas que geram muitos logs, considere separar também `/var/lib`.
+- Avalie o uso de **LVM** quando precisar de flexibilidade ou em ambientes corporativos.
+- Swap: não precisa ser gigante, mas é recomendado ter pelo menos o equivalente a **RAM** em sistemas com hibernação ou metade da RAM em servidores modernos.
+
+### Para o tutorial...
+
+Vou demonstrar como é configurado o LVM usando múltiplas partições (/, /boot e /tmp), assim, já fica documentado caso queira também implementar na sua rede. Para isso, selecione o modo manual:
+![debian-install-1](/images/debian13-instalacao-19.png)
+
+Selecione o disco a ser particionado:
+![debian-install-1](/images/debian13-instalacao-20.png)
+
+Marque sim e continue.
+![debian-install-1](/images/debian13-instalacao-21.png)
+
+Selecione a partição `ESPAÇO LIVRE`
+![debian-install-1](/images/debian13-instalacao-22.png)
+
+Selecione criar uma nova partição:
+![debian-install-1](/images/debian13-instalacao-23.png)
+
+Será a nossa partição do diretório /boot, que inicializa a máquina. Matenha o tamanho da partição como 2G:
+![debian-install-1](/images/debian13-instalacao-24.png)
+
+Primária
+![debian-install-1](/images/debian13-instalacao-25.png)
+
+Início.
+![debian-install-1](/images/debian13-instalacao-26.png)
+
+Aqui, vamos alterar as opções:
+
+- Ponto de montagem: alterar para /boot
+- Flag inicializável: ligado.
+
+E finalizar a configuração.
+![debian-install-1](/images/debian13-instalacao-27.png)
+
+Agora, vamos selecionar "Configurar o Gerenciador de Volumes Lógicos":
+![debian-install-1](/images/debian13-instalacao-29.png)
+
+Sim.
+![debian-install-1](/images/debian13-instalacao-30.png)
+
+Criar novo grupo de volumes:
+![debian-install-1](/images/debian13-instalacao-31.png)
+
+De um nome ao grupo. Eu gosto de usar vg-main, para indicar que é o grupo do disco principal:
+![debian-install-1](/images/debian13-instalacao-34.png)
+
+Selecione o espaço não alocado do disco:
+![debian-install-1](/images/debian13-instalacao-35.png)
+
+Grave as mudanças:
+![debian-install-1](/images/debian13-instalacao-36.png)
+
+Agora, vamos criar os volumes lógicos:
+
+- lv-root, para o diretório `/`
+- lv-tmp, para o diretório `/tmp`
+  Selecione a opção Criar volume lógico:
+  ![debian-install-1](/images/debian13-instalacao-37.png)
+
+Selecione o vg-main:
+![debian-install-1](/images/debian13-instalacao-38.png)
+
+Vou começar pelo lv-root, que terá 10G de espaço do meu disco de 16G.
+![debian-install-1](/images/debian13-instalacao-39.png)
+
+Informo que ele tem 10GB
+![debian-install-1](/images/debian13-instalacao-40.png)
+
+Agora, faço o mesmo procedimento para o lv-tmp, mas ele terá 2GB, ficando:
+
+- 10GB para o /
+- 2GB para o /boot
+- 2GB para o /tmp
+- 2GB não alocados no disco para futura expansão.
+
+> Se quiser criar mais particionamentos, para outros diretórios, basta seguir os mesmos passos.
+
+E finalizo a criação:
+![debian-install-1](/images/debian13-instalacao-41.png)
+
+Seleciono meu lv-root:
+![debian-install-1](/images/debian13-instalacao-42.png)
+
+Marco ele para ser usado como ext4 e o ponto de montagem como /:
+![debian-install-1](/images/debian13-instalacao-43.png)
+
+> Faça o mesmo procedimento para o lv-tmp, apontando o ponto de montagem para o /tmp.
+
+## Continuando a instalação
+
+Agora que já sabemos as vantagens, desvantagens, casos de usos, podemos resumir nossa instalação. Como eu não criei uma partição de SWAP, o instalador reclamou, mas vou apenas marcar não e continuar:
+![debian-install-1](/images/debian13-instalacao-44.png)
+
+Marque que deseja escrever as mudanças no disco para continuar.
+![debian-install-1](/images/debian13-instalacao-45.png)
+
+Aguarde a instalação do sistema.
+![debian-install-1](/images/debian13-instalacao-46.png)
+
+Não precisamos ler uma mídia adicional.
+![debian-install-1](/images/debian13-instalacao-47.png)
+
+Vamos selecionar o Brasil aqui para ele carregar os repositórios de pacotes brasileiros.
+![debian-install-1](/images/debian13-instalacao-48.png)
+
+Pode escolher o **deb.debian.org** mesmo.
+![debian-install-1](/images/debian13-instalacao-49.png)
+
+Se usar proxy na sua rede, preencha aqui. Se não souber o que é, pode deixar em branco.
+![debian-install-1](/images/debian13-instalacao-50.png)
+
+Agora aguardamos ele finalizar a configuração do APT, é necessário ter internet na máquina nesse momento.
+![debian-install-1](/images/debian13-instalacao-51.png)
+
+Aqui deixo a sua escolha. Se marcar sim, semanalmente enviará estatísticas (anônimas) dos pacotes que estão instalados no seu sistema para a Debian. Se marcar não, desativa o envio. Como é um laboratório, não tem porque eu enviar estatísticas.
+![debian-install-1](/images/debian13-instalacao-52.png)
+
+Se você quer usar o Debian com desktop, mantenha as opções:
+
+- ambiente de área de trabalho no Debian (e escolha uma das áreas de trabalho)
+  - Xfce
+  - GNOME Flashback
+  - KDE Plasma
+  - Cinnamon
+  - MATE
+  - LXDE
+  - LXQt
+- utilitários de sistema padrão
+
+Se for usar como servidor, mantenha, apenas:
+
+- servidor SSH
+- utilitários de sistema padrão
+
+Nos nossos laboratórios, vamos usar como servidor, portanto:
+![debian-install-1](/images/debian13-instalacao-53.png)
+
+Agora esperamos ele instalar os aplicativos, novamente, é necessário ter internet:
+![debian-install-1](/images/debian13-instalacao-54.png)
+
+Nessa tela, clique em **sim** caso contrário seu sistema poderá não iniciar corretamente.
+![debian-install-1](/images/debian13-instalacao-55.png)
+
+Selecione o disco que está a partição /boot.
+![debian-install-1](/images/debian13-instalacao-56.png)
+
+Aguarde finalizar a instalação:
+![debian-install-1](/images/debian13-instalacao-57.png)
+
+Por fim, clique em continuar para reiniciar o computador.
+![debian-install-1](/images/debian13-instalacao-58.png)
+
+E você irá ver a tela do GRUB quando ligar novamente:
+![debian-install-1](/images/debian13-instalacao-59.png)
+
+Por fim, chegamos a tela de login. A instalação do sistema operacional foi concluída! Mas não terminamos de configurar o sistema ainda.
+![debian-install-1](/images/debian13-instalacao-60.png)
+
+---
+
+# Pós Instalação
+
+O primeiro passo do pós-instalação é logar com o usuário pessoal que criamos durante a instalação. Para isso, abra um terminal no seu computador (ou use um aplicativo como o PuTTY) e digite:
+
+```sh
+ssh usuario@ip_do_linux
+```
+
+A primeira coisa que vamos fazer é escalar os privilégios para o usuário root:
+
+```sh
+su -
+# Informe a senha do usuário root.
+```
+
+Em seguida, atualize a lista de pacotes e também os programas do sistema:
+
+```sh
+apt update -y
+apt upgrade -y
+```
+
+## Configuração do NTP
+
+Vamos aproveitar e configurar o cliente NTP para consultar nos servidores do _.br_, edite o arquivo localizado em `/etc/systemd/timesyncd.conf` (pode usar o nano, vi, vim) e modifique a linhas NTP e FallbackNTP para:
+
+```txt
+NTP=pool.ntp.br
+FallbackNTP=a.ntp.br b.ntp.br
+```
+
+Depois, reinicie o serviço do cliente NTP para ele ler as configurações novas:
+
+```sh
+systemctl restart systemd-timesyncd
+```
+
+Eu também gosto de adicionar o comando sudo, para não precisar ficar escalando privilégios para o usuário root a todo momento.
+
+```sh
+apt install -y sudo
+usermod -aG sudo USUARIO
+```
+
+> Não esqueça de alterar USUARIO para o seu nome de usuário.
+
+E o comando abaixo faz com que o sudo não peça a senha para executar os comandos como root:
+
+```sh
+echo "%sudo ALL=(ALL:ALL) ALL" > /etc/sudoers.d/90-sudo
+```
+
+> É um risco extra para instalações com senha, mas prefiro não ter que ficar digitando elas. Além disso, meus servidores costumam não ter senhas de usuários e o login é feito apenas por chaves públicas, [igual este artigo](https://felipepadilha.com.br/blog/linux/lnx1-login-ssh-automatico-usando-chaves-publicas-e-privadas) então acaba sendo necessário.
+
+## Pacotes Padrão
+
+Que tal instalar alguns utilitários para monitoramento e facilidade de uso do sistema? Esses aqui vão em praticamente todos os servidores que gerencio:
+
+```sh
+sudo apt install -y \
+  htop \
+  iotop \
+  iftop \
+  ncdu \
+  bind9-dnsutils \
+  traceroute \
+  tcpdump \
+  nmap \
+  curl \
+  wget \
+  grc \
+  tree \
+  whois
+```
+
+Uma breve descrição de cada pacote:
+
+- **htop** → Monitor interativo de processos. Mostra uso de CPU, memória e carga do sistema em tempo real, com interface colorida e mais amigável que o `top`.
+- **iotop** → Mostra em tempo real quais processos estão consumindo mais I/O de disco. Útil para diagnosticar lentidão causada por escrita/leitura intensa.
+- **iftop** → Faz o mesmo que o `iotop`, mas para rede. Exibe quais conexões estão usando mais banda de rede em tempo real.
+- **ncdu** → Analisa o uso de disco e mostra de forma navegável quais pastas e arquivos ocupam mais espaço. Muito útil em servidores quando o disco começa a encher.
+- **bind9-dnsutils** → Conjunto de ferramentas de DNS, incluindo o `dig` e o `nslookup`, indispensáveis para diagnosticar problemas de resolução de nomes.
+- **traceroute** → Mostra o caminho (saltos) que os pacotes percorrem até chegar a um destino. Usado em troubleshooting de rede.
+- **tcpdump** → Sniffer de pacotes via linha de comando. Permite capturar e analisar tráfego de rede, ótimo para debug de protocolos e segurança.
+- **nmap** → Scanner de portas e serviços. Permite mapear hosts ativos e identificar portas abertas e sistemas em uma rede.
+- **curl** → Ferramenta de linha de comando para transferir dados via HTTP, HTTPS, FTP e outros protocolos. Essencial para testar APIs e baixar arquivos.
+- **wget** → Similar ao `curl`, mas voltado para downloads. Muito usado para baixar arquivos direto do terminal.
+- **grc** → “Generic Colouriser”. Adiciona cores a comandos que normalmente são monocromáticos, como `ping`, `netstat`, `traceroute`.
+- **tree** → Mostra a estrutura de diretórios em formato de árvore hierárquica, facilitando a visualização de pastas.
+- **whois** → Permite consultar registros WHOIS de domínios e IPs, útil para checar informações de propriedade de sites e redes.
+
+### Ajustes no Bash
+
+Um pouco de cor no terminal sempre ajuda na concentração — especialmente para quem tem déficit de atenção (minha nota foi 99 de 100 na última vez que fiz o teste).
+
+```sh
+# Adicione no início do arquivo
+__get_ip() {
+  ip addr show | awk '/inet / && $2 !~ /^127/ { sub(/\/.*/, "", $2); print $2; exit }'
+}
+
+# Procure por:
+# if [ "$color_prompt" = yes ]; then
+#     PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+# else
+#    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+# fi
+# E altere o primeiro PS1 para o que está abaixo:
+    PS1='\[\e[01;36m\]\t \[\e[01;32m\]\u\[\e[0m\]\[\e[01;37m\]@\[\e[0m\]\[\e[01;35m\]\h \[\e[01;33m\]$(__get_ip) \[\e[01;34m\]\w\[\e[0m\]\n$ '
+```

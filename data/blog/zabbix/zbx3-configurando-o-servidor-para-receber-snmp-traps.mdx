@@ -1,5 +1,5 @@
 ---
-title: 'Configurando SNMP Traps no Zabbix 7' 
+title: 'Configurando SNMP Traps no Zabbix 7'
 date: '2025-03-03'
 tags: ['zabbix']
 draft: false
@@ -7,6 +7,8 @@ summary: O artigo demonstra a configuração necessária para configurar o receb
 ---
 
 ## Índice
+
+- [Índice](#índice)
 - [Introdução](#introdução)
   - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
 - [Instalação e Configuração do Serviço de SNMPTrap](#instalação-e-configuração-do-serviço-de-snmptrap)
@@ -14,49 +16,55 @@ summary: O artigo demonstra a configuração necessária para configurar o receb
 
 ## Introdução
 
-O monitoramento de redes é essencial para garantir a disponibilidade, o desempenho e a segurança de 
-nossos ambientes de TI. Nesse contexto, o protocolo SNMP (Simple Network Management Protocol) 
-desempenha um papel crucial ao permitir a coleta de informações e o envio de notificações sobre 
+O monitoramento de redes é essencial para garantir a disponibilidade, o desempenho e a segurança de
+nossos ambientes de TI. Nesse contexto, o protocolo SNMP (Simple Network Management Protocol)
+desempenha um papel crucial ao permitir a coleta de informações e o envio de notificações sobre
 eventos relevantes nos equipamentos de rede.
 
-As SNMP Traps são mensagens enviadas pelos dispositivos para alertar o sistema de monitoramento sobre 
-eventos inesperados, falhas ou mudanças de estado. Essa abordagem baseada em eventos é extremamente 
-vantajosa, pois elimina a necessidade de polling (coleta) constante, reduzindo o tráfego de rede e 
+As SNMP Traps são mensagens enviadas pelos dispositivos para alertar o sistema de monitoramento sobre
+eventos inesperados, falhas ou mudanças de estado. Essa abordagem baseada em eventos é extremamente
+vantajosa, pois elimina a necessidade de polling (coleta) constante, reduzindo o tráfego de rede e
 permitindo uma resposta mais rápida a incidentes.
 
-Neste artigo, exploraremos como configurar o Zabbix para receber e processar SNMP Traps, possibilitando 
+Neste artigo, exploraremos como configurar o Zabbix para receber e processar SNMP Traps, possibilitando
 uma solução de monitoramento completa e proativa para sua rede.
 
 ### Link para o tutorial em vídeo
-<YouTube id="bb7-yYaCYnA"/>
+
+<YouTube id="bb7-yYaCYnA" />
 
 ## Instalação e Configuração do Serviço de SNMPTrap
 
 Vamos começar pelo básico, atualizar a lista de repositórios e então baixar as dependências que vamos usar:
+
 ```sh
 sudo apt update
 sudo apt install snmp snmpd snmptrapd libsnmp-perl snmp-mibs-downloader
 ```
 
 Agora vamos baixar o script (escrito em Perl) para tratamento das Traps SNMP fornecido diretamente pela Zabbix:
+
 ```sh
 sudo curl -o /usr/bin/zabbix_trap_receiver.pl https://git.zabbix.com/projects/ZBX/repos/zabbix/raw/misc/snmptrap/zabbix_trap_receiver.pl
 sudo chmod +x /usr/bin/zabbix_trap_receiver.pl
 ```
 
 Vamos editar o script para apontar que ele deverá escrever as traps no arquivo `/var/log/snmptrap/snmptrap.log`:
+
 ```sh
 sudo sed -i "s|\$SNMPTrapperFile = '/tmp/zabbix_traps.tmp';|\$SNMPTrapperFile = '/var/log/snmptrap/snmptrap.log';|" /usr/bin/zabbix_trap_receiver.pl
 ```
 
 E criamos o arquivo e ajustamos a permissão antes de iniciar o serviço de snmptrap para evitar quaisquer erros:
+
 ```sh
 sudo mkdir /var/log/snmptrap
 sudo touch /var/log/snmptrap/snmptrap.log
 sudo chmod 755 -R /var/log/snmptrap
 ```
 
-Vamos ajustar a community SNMP no nosso arquivo de `snmptrap.conf`, altere *public* para o padrão de community que utiliza na sua rede:
+Vamos ajustar a community SNMP no nosso arquivo de `snmptrap.conf`, altere _public_ para o padrão de community que utiliza na sua rede:
+
 ```sh
 sudo tee /etc/snmp/snmptrap.conf > /dev/null <<EOF
 authCommunity execute public
@@ -65,6 +73,7 @@ EOF
 ```
 
 Criamos um arquivo de logrotate para evitar que o log cresça indefinidamente:
+
 ```sh
 sudo tee /etc/logrotate.d/snmptrap > /dev/null <<EOF
 /var/log/snmptrap/snmptrap.log {
@@ -78,13 +87,15 @@ sudo tee /etc/logrotate.d/snmptrap > /dev/null <<EOF
 EOF
 ```
 
-Vamos ajustar o arquivo de serviço do `snmptrapd` para usar o usuário *root* e ajustar para o SNMP carregar as MIBs na inicialização:
+Vamos ajustar o arquivo de serviço do `snmptrapd` para usar o usuário _root_ e ajustar para o SNMP carregar as MIBs na inicialização:
+
 ```sh
 sudo sed -i 's/User=Debian-snmp/User=root/' /usr/lib/systemd/system/snmptrapd.service
 sudo sed -i 's/mibs.*/# mibs/' /etc/snmp/snmp.conf
 ```
 
 Vamos recarregar a lista de serviços e iniciar o `snmptrapd`:
+
 ```sh
 sudo systemctl daemon-reload
 sudo systemctl restart snmptrapd
@@ -97,29 +108,33 @@ sudo systemctl disable snmpd --now
 ## Configuração no Zabbix
 
 Editamos o arquivo de configuração do servidor Zabbix para ele iniciar os processos de SNMPTrap e reiniciamos o servidor para ele atualizar com a mudança:
+
 ```sh
 sudo sed -i 's/^# StartSNMPTrapper=.*/StartSNMPTrapper=1/' /etc/zabbix/zabbix_server.conf
 sudo systemctl restart zabbix-server
 ```
 
 Criamos um item de fallback no template de SNMP (pode ser um à sua escolha ou pode criar um novo template). Normalmente, todos os templates base do Zabbix têm um item de SNMP.
+
 - **Nome do Item**: SNMP Traps (Fallback)
 - **Tipo**: Trap SNMP
 - **Chave**: snmptrap.fallback
 - **Tipo de informação**: Log
 - **Formato de data no log**: hh:mm:sszyyyy/MM/dd
-![zbx3-img1](/images/zbx3-img1.png)
+  ![zbx3-img1](/images/zbx3-img1.png)
 
 E podemos criar um item específico par amonitoramento de traps referentes as interfaces de rede, basta alterarmos a chave:
+
 - **Nome do Item**: SNMP Traps: Link Caiu
 - **Tipo**: Trap SNMP
 - **Chave**: snmptrap\[IF-MIB::linkDown\]
 - **Tipo de informação**: Log
 - **Formato de data no log**: hh:mm:sszyyyy/MM/dd
-![zbx3-img2](/images/zbx3-img2.png)
+  ![zbx3-img2](/images/zbx3-img2.png)
 
 E criamos um alarme para toda vez que recebermos uma trap de uma interface:
+
 - **Nome da trigger**: `SNMP TRAP Recebido – Interface Caiu – {{ITEM.LASTVALUE}.regsub("IF-MIB::ifDescr.\\'(.*?)\\'", \1)}`
 - **Dados Operacionais**: `{{ITEM.LASTVALUE}.regsub("IF-MIB::ifDescr.\\'(.*?)\\'", \1)}`
 - **Expressão**: `nodata(/Template – MIB2 – Interfaces/snmptrap[IF-MIB::linkDown],1m)=0`
-![zbx3-img3](/images/zbx3-img3.png)
+  ![zbx3-img3](/images/zbx3-img3.png)

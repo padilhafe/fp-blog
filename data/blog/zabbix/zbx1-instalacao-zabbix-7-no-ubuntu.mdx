@@ -1,23 +1,25 @@
 ---
-title: 'Instalação Zabbix 7 no Ubuntu - Parte I' 
+title: 'Instalação Zabbix 7 no Ubuntu - Parte I'
 date: '2025-02-10'
 tags: ['zabbix']
 draft: false
 summary: Este artigo demonstra como realizar a instalação do Zabbix 7 no Ubuntu 24.04 de forma centralizada.
 ---
 
-## Índice
+# Índice
 
-- [Introdução](#introducao)
+- [Índice](#índice)
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
 - [Instalação Centralizada](#instalação-centralizada)
   - [Atualização do sistema e instalação do banco de dados](#atualização-do-sistema-e-instalação-do-banco-de-dados)
   - [Instalação e configuração da aplicação Zabbix](#instalação-e-configuração-da-aplicação-zabbix)
   - [Últimas configurações e primeiro acesso](#últimas-configurações-e-primeiro-acesso)
-- [Script de Instalação](#script-de-instalação)
+  - [Script de Instalação](#script-de-instalação)
 
-## Introdução
+# Introdução
 
-O Zabbix é uma plataforma open-source de monitoramento que permite coletar, armazenar e anaisar métricas de redes, servidores, 
+O Zabbix é uma plataforma open-source de monitoramento que permite coletar, armazenar e anaisar métricas de redes, servidores,
 contêineres e aplicações. Suportando métodos de coleta como SNMP, IPMI, agentes dedicados e consultas HTTP. Ele também oferece
 monitoramento ativo e passivo, que permite realizar coletas através de redes NAT, além de alertas configuráveis e gráficos detalhados.
 
@@ -34,18 +36,20 @@ parte, abordaremos a instalação do Zabbix em um ambiente Ubuntu, cobrindo requ
 Será apresentado a abordagem de instalação centralizada (todos os serviços em uma única máquina), e nas partes seguintes, a abordagem
 distribuída, baseada em contêineres e altamente disponível.
 
-### Link para o tutorial em vídeo
-<YouTube id="3gioL8Hr3mo"/>
+## Link para o tutorial em vídeo
+
+<YouTube id="3gioL8Hr3mo" />
 
 ---
 
-## Instalação Centralizada
+# Instalação Centralizada
 
 Nesta abordagem, todos os componente do servidor Zabbix - o próprio Servidor Zabbix, o banco de dados e a interace web - serão instalados
-na mesma máquina, facilitando a gestão e a manutenção do ambiente. Ao longo deste artigo, serão apresentados os comadnos para instalação 
+na mesma máquina, facilitando a gestão e a manutenção do ambiente. Ao longo deste artigo, serão apresentados os comadnos para instalação
 e configuração.
 
 A configuração da máquina utilizada neste artigo é:
+
 ```sh
 felipe-padilha@ubuntu-zabbix:~$ cat /etc/os-release
 PRETTY_NAME="Ubuntu 24.04.2 LTS"
@@ -56,25 +60,28 @@ VERSION_CODENAME=noble
 ```
 
 Em uma instalação de produção, recomendo realizar o particionamento de disco, deixando os diretórios /, /boot e do banco de dados
-(/var/lib/\<mysql,postgres,etc\>) em partições separadas. Inclusive, se utilizar múltiplos *tier* de disco no seu ambiente, utilize
-o com maior número de *IOPS* para a partição do banco de dados.
+(/var/lib/\<mysql,postgres,etc\>) em partições separadas. Inclusive, se utilizar múltiplos _tier_ de disco no seu ambiente, utilize
+o com maior número de _IOPS_ para a partição do banco de dados.
 
 ---
 
-### Atualização do sistema e instalação do banco de dados
+## Atualização do sistema e instalação do banco de dados
 
 A primeira coisa que devemos fazer é atualizar o sistema operacional:
+
 ```sh
 sudo apt update -y && sudo apt upgrade -y
 ```
 
 Entãos instalamos o banco de dados, para este artigo irei utilizar o MariaDB:
+
 ```sh
 sudo apt install mariadb-server mariadb-client -y
 ```
 
-Com o banco instalado, vamos usar o utilitário **mysql_secure_installation** para fazer a configuração inicial de segurança do 
+Com o banco instalado, vamos usar o utilitário **mysql_secure_installation** para fazer a configuração inicial de segurança do
 nosso banco de dados. Este script automatiza o processo de configuração do usuário root do banco entre outos ajustes de segurança.
+
 ```sh
 sudo mysql_secure_installation
 ```
@@ -91,9 +98,9 @@ O script irá fazer algumas perguntas durante sua execução. Basta seguir as re
 - `Remove test database and access to it? [Y/n]`: pressione `y`.
 - `Reload privilege tables now? [Y/n]`: pressione `y`.
 
-
-Feito isso, temos a instalação do nosso MariaDB protegida. Agora, vamos acessá-lo para criarmos o banco de dados do Zabbix e o usuário 
+Feito isso, temos a instalação do nosso MariaDB protegida. Agora, vamos acessá-lo para criarmos o banco de dados do Zabbix e o usuário
 de acesso, execute os comandos abaixo para configurar o banco de dados:
+
 ```sh
 # Definindo variáveis
 ZABBIX_DB="zabbix"
@@ -109,6 +116,7 @@ EOF
 ```
 
 **Explicação dos comandos:**
+
 - **ZABBIX_DB="zabbix"**: cria uma variável chamada `ZABBIX_DB` e atribui o valor `zabbix`.
 - **ZABBIX_DB_USER="zabbix"**: cria uma variável chamada `ZABBIX_DB_USER` e atribui o valor `zabbix`.
 - **ZABBIX_DB_PASSWORD="senha_segura"**: cria uma variável chamada `ZABBIX_DB_PASSWORD` e atribui o valor `senha_segura`.
@@ -119,13 +127,14 @@ EOF
 - **FLUSH PRIVILEGES;**: força o MySQL a recarregar as permissões imediatamente.
 - **EOF**: finaliza o bloco `heredoc`, enviando todos os comandos acima para execução no banco.
 
-Lembre-se de alterar os valores de *ZABBIX_DB*, *ZABBIX_DB_USER* e *ZABBIX_DB_PASSWORD* para os valores reais de sua instalação.
+Lembre-se de alterar os valores de _ZABBIX_DB_, _ZABBIX_DB_USER_ e _ZABBIX_DB_PASSWORD_ para os valores reais de sua instalação.
 
 ---
 
-### Instalação e configuração da aplicação Zabbix
+## Instalação e configuração da aplicação Zabbix
 
 A primeira coisa que precisamos fazer é instalar o repositório Zabbix para termos acesso a versão 7.
+
 ```sh
 wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu24.04_all.deb
 sudo dpkg -i zabbix-release_latest+ubuntu24.04_all.deb
@@ -134,6 +143,7 @@ sudo apt update -y
 ```
 
 Com o repositório instalado, agora temos acesso aos pacotes do Zabbix para instalarmos:
+
 ```sh
 sudo apt install -y \
     zabbix-server-mysql \
@@ -144,8 +154,9 @@ sudo apt install -y \
 ```
 
 Com tudo isntalado, precisamos alterar algumas configurações nos arquivos .conf do Zabbix e do Nginx, além de popular o banco de dados.
-Para não ser ncessário utilizar um editor de texto com oo Nano ou Vim, deixo abaixo os comadnos utilizando o *sed* para alterar as linhas 
+Para não ser ncessário utilizar um editor de texto com oo Nano ou Vim, deixo abaixo os comadnos utilizando o _sed_ para alterar as linhas
 de texto via expressão regular. Não esqueça de alterar as variáveis para os valores do seu ambiente.
+
 ```sh
 # Definindo variáveis
 SERVER_NAME="seu.dominio.com"
@@ -167,11 +178,13 @@ echo "php_value[date.timezone] = America/Sao_Paulo" | sudo tee -a /etc/zabbix/ph
 Lembrando que **seu.dominio.com** pode simplesmente ser o endereço IP da máquina.
 
 Para popularmos o banco de dados com as tabelas esperadas pela aplicação Zabbix, usamos o comando abaixo:
+
 ```sh
 zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -u"${ZABBIX_DB_USER}" -p"${ZABBIX_DB_PASSWORD}" "${ZABBIX_DB}"
 ```
 
 Por fim, reiniciamos o serviço do Zabbix e do Nginx para ler as configurações novas e habilitamos a inicialização dos serviços junto com a máquina.
+
 ```sh
 sudo systemctl restart zabbix-server zabbix-agent nginx
 sudo systemctl enable zabbix-server zabbix-agent nginx
@@ -179,7 +192,7 @@ sudo systemctl enable zabbix-server zabbix-agent nginx
 
 ---
 
-### Últimas configurações e primeiro acesso
+## Últimas configurações e primeiro acesso
 
 Navegue até http://seu.dominio.com ou o endereço IP do seu servidor (depende do que configurou no parâmetro SERVER_NAME) para finalizar
 as configurações do seu Zabbix. Ao acessar, você irá cair nesta página:
@@ -202,7 +215,7 @@ A tela de resumo das configurações que foram feitas. Clique em **Próximo pass
 Com isso nossa instalação termina e temos um servidor Zabbix funcional. Clique em **Fim** para ser direcionado a tela de login.
 ![Blog0001Imagem0006](/images/blog0001-img0006.png)
 
-O usuário padrão é *Admin* e a senha é *zabbix*.
+O usuário padrão é _Admin_ e a senha é _zabbix_.
 ![Blog0001Imagem0007](/images/blog0001-img0007.png)
 
 E caimos na dashboard padrão da instalação. Meus parabéns, você concluiu a instalação!
@@ -210,10 +223,12 @@ E caimos na dashboard padrão da instalação. Meus parabéns, você concluiu a 
 
 ---
 
-### Script de Instalação
-Os comandos abaixos são todos os comandos executados para realizar a instalação do Zabbix. Como está usando variáveis, é possível 
-apenas alterar seus valores, copiar e colar para ter uma instalação funcional, ou você copiar para um arquivo, dar permissão de execução 
+## Script de Instalação
+
+Os comandos abaixos são todos os comandos executados para realizar a instalação do Zabbix. Como está usando variáveis, é possível
+apenas alterar seus valores, copiar e colar para ter uma instalação funcional, ou você copiar para um arquivo, dar permissão de execução
 e executar como um script.
+
 ```sh
 #!/bin/bash
 # Script de Instalação do Zabbix 7 no Ubuntu 24.04 - Instalação Centralizada

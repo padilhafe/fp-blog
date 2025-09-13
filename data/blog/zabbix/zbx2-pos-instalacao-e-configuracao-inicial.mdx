@@ -1,5 +1,5 @@
 ---
-title: 'Configuração inicial e ajustes de pós instalação' 
+title: 'Configuração inicial e ajustes de pós instalação'
 date: '2025-02-18'
 tags: ['zabbix']
 draft: false
@@ -8,50 +8,57 @@ summary: Este artigo fornece orientações das configurações iniciais necessá
 
 ## Índice
 
-- [Introdução](#introducao)
+- [Índice](#índice)
+- [Introdução](#introdução)
+  - [Objetivos principais:](#objetivos-principais)
   - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
 - [Ajustar parâmetros de segurança](#ajustar-parâmetros-de-segurança)
   - [Habilitar HTTPS](#habilitar-https)
   - [Alterar a senha do usuário admin](#alterar-a-senha-do-usuário-admin)
-  - [Entender quais portas o Zabbix utiliza para restringir acesso apenas a endereços IP permitidos](#entender-quais-portas-o-zabbix-utiliza-para-restringir-acesso-apenas-a-endereços-ip-permitidos)
+  - [Entender quais portas o Zabbix utiliza para restringir acesso apenas a endereços IP permitidos.](#entender-quais-portas-o-zabbix-utiliza-para-restringir-acesso-apenas-a-endereços-ip-permitidos)
 - [Boas práticas para organização via grupos](#boas-práticas-para-organização-via-grupos)
 - [Habilitar o inventário automático de hosts](#habilitar-o-inventário-automático-de-hosts)
 - [Personalizar o ambiente Zabbix](#personalizar-o-ambiente-zabbix)
+  - [Trocando as Logos](#trocando-as-logos)
 
 ## Introdução
 
-Após a instalação do Zabbix, é fundamental realizar uma configuração inicial adequada para garantir um funcionamento 
-seguro e eficiente do servidor. Neste artigo, abordaremos os ajustes essenciais para personalizar o ambiente de monitoramento, 
-garantindo que os hosts, itens e templates sejam configurados corretamente desde o início. Além disso, vamos verificar 
+Após a instalação do Zabbix, é fundamental realizar uma configuração inicial adequada para garantir um funcionamento
+seguro e eficiente do servidor. Neste artigo, abordaremos os ajustes essenciais para personalizar o ambiente de monitoramento,
+garantindo que os hosts, itens e templates sejam configurados corretamente desde o início. Além disso, vamos verificar
 as boas práticas para otimizar a administração do Zabbix, facilitando a escalabilidade e a manutenção a longo prazo.
 
 ### Objetivos principais:
+
 - Ajustar parâmetros para aumentar a segurança do servidor.
 - Aplicar boas práticas para organização de hosts e templates via grupos.
 - Habilitar o inventário automático de hosts
 - Configurar e personalizar o ambiente do Zabbix logo após a instalação.
 
 ### Link para o tutorial em vídeo
-<YouTube id="8H37DPsz1d4"/>
+
+<YouTube id="8H37DPsz1d4" />
 
 ---
 
 ## Ajustar parâmetros de segurança
 
 ### Habilitar HTTPS
-Para habilitar o https, vou utilizar o domínio zabbix.felipepadilha.com.br, que irá resolver para o endereço IP da 
+
+Para habilitar o https, vou utilizar o domínio zabbix.felipepadilha.com.br, que irá resolver para o endereço IP da
 minha instalação do Zabbix. E com o Certbot será gerado os certificados HTTPS para acesso criptografado.
 
-Este é um passo muito importante se o seu servidor Zabbix fizer parte de uma rede não segura (ou seja, que você não 
-administra completamente), pois o protocolo HTTP transmite as informações em texto claro. Veja um exemplo abaixo da 
+Este é um passo muito importante se o seu servidor Zabbix fizer parte de uma rede não segura (ou seja, que você não
+administra completamente), pois o protocolo HTTP transmite as informações em texto claro. Veja um exemplo abaixo da
 captura de pacotes enquanto realizada login no servidor Zabbix sem suporte a SSL:
 ![Blog0002Imagem0001](/images/blog0002-img0001.png)
 
 Perceba na caixa destacada que os valores dos campos de login estão completamente visíveis na captura de pacotes, qualquer
 pessoa com capacidade de escutar pacotes nesta rede conseguiria ver as credenciais de acesso do meu servidor Zabbix.
 
-Para resolver o problema, após configurar seu servidor DNS para apontar corretamenteo domínio que irá utilizar no seu 
+Para resolver o problema, após configurar seu servidor DNS para apontar corretamenteo domínio que irá utilizar no seu
 servidor Zabbix, instale o certbot (utilitário para gerenciar certificados SSL) por meio dos comandos abaixo:
+
 ```sh
 sudo apt update -y
 sudo apt install -y python3 python3-venv libaugeas0
@@ -61,18 +68,18 @@ sudo /opt/certbot/bin/pip install certbot certbot-nginx
 sudo ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 ```
 
-Com os comandos acima, teremos o Certbot instalado. Antes de emitirmos o certificado, garanta que o parâmetro *server_name* 
+Com os comandos acima, teremos o Certbot instalado. Antes de emitirmos o certificado, garanta que o parâmetro _server_name_
 no arquivo de configuração do nginx do Zabbix (`/etc/zabbix/nginx.conf`) está preenchido corretamente com o endereço DNS.
 
 Execute:
+
 ```sh
 sudo certbot --nginx
 ```
 
-Você pode preencher com seu endereço de email ou pressionar enter para pular, recomendo preencher com o endereço de email 
+Você pode preencher com seu endereço de email ou pressionar enter para pular, recomendo preencher com o endereço de email
 para os casos que a LetsEncrypt necessite realizar contato:
 ![Blog0002Imagem0002](/images/blog0002-img0002.png)
-
 
 Ele irá solicitar para aceitar os termos de uso, **leia** e aceite posteriormente pressionando `y`.
 ![Blog0002Imagem0003](/images/blog0002-img0003.png)
@@ -82,7 +89,7 @@ Ele irá solicitar para aceitar os termos de uso, **leia** e aceite posteriormen
 Aqui fica a sua escolha digitar `yes` ou `no`, se aceitar irá receber e-mails promocionais dos desenvolvedores do certbot.
 ![Blog0002Imagem0004](/images/blog0002-img0004.png)
 
-O certbot irá identificar automaticamente o domínio em uso, basta confirmarmos o ID que desejamos emitir o certificado 
+O certbot irá identificar automaticamente o domínio em uso, basta confirmarmos o ID que desejamos emitir o certificado
 HTTPS. Lembrando que neste ponto, ambas as portas 80 e 443 devem estar publicamente alcançáveis no servidor.
 ![Blog0002Imagem0005](/images/blog0002-img0005.png)
 
@@ -92,24 +99,26 @@ Se ocorrer tudo certo, você verá a mensagem que o certificado foi emitido. Ago
 
 Perceba a diferença na captura de pacotes ao realizar um login no Zabbix agora:
 ![Blog0002Imagem0008](/images/blog0002-img0008.png)
+
 > Não é possível nem mesmo ver a URI ou o método HTTP que foi acessado.
 
 Por fim, vamos adicionar uma tarefa na cron para que o certbot renove os certificados de forma automática:
+
 ```sh
 echo "0 0,12 * * * root /opt/certbot/bin/python -c 'import random; import time; time.sleep(random.random() * 3600)' && sudo certbot renew -q" | sudo tee -a /etc/crontab > /dev/null
 ```
 
 ### Alterar a senha do usuário admin
 
-Também não queremos que o usuário Admin fique com a senha padrão. Para alteramos, navegue até *Usuários -> Usuários* no menu 
+Também não queremos que o usuário Admin fique com a senha padrão. Para alteramos, navegue até _Usuários -> Usuários_ no menu
 lateral esquerdo.
 ![Blog0002Imagem0009](/images/blog0002-img0009.png)
 
-Você irá cair na tela de administração de usuários, se quisermos criar um novo usuário, editar, excluir ou inativar, 
+Você irá cair na tela de administração de usuários, se quisermos criar um novo usuário, editar, excluir ou inativar,
 fazemos por aqui.
 ![Blog0002Imagem0010](/images/blog0002-img0010.png)
 
-Clique no usuário *Admin* e então clique no botão **Alterar senha**. Preencha com a nova senha e clique no botão **Atualizar** 
+Clique no usuário _Admin_ e então clique no botão **Alterar senha**. Preencha com a nova senha e clique no botão **Atualizar**
 no fim do formulário.
 ![Blog0002Imagem0011](/images/blog0002-img0011.png)
 
@@ -118,21 +127,23 @@ Pronto, com isso alteramos a senha do usuário Admin.
 ### Entender quais portas o Zabbix utiliza para restringir acesso apenas a endereços IP permitidos.
 
 Este ponto dependerá bastante da sua infraestrutura local e como pretende usar o Zabbix (na nuvem, instalado localmente).
-Mas irei deixar um exemplo de configuração de firewall utilizando o UFW (Uncomplicated Firewall), que vem instalado por 
+Mas irei deixar um exemplo de configuração de firewall utilizando o UFW (Uncomplicated Firewall), que vem instalado por
 padrão junto do Ubuntu, permitindo acesso apenas a redes locais.
 
 **Mas atenção!**
 
-Antes de iniciarmos qualquer configuração de firewall, na qual existe uma chance de perder acesso ao servidor, garanta 
-que você ainda consegue acessar o console de alguma forma para eventuais correções. Valide que o ufw está inativo por 
-meio do comando `sudo ufw status`. Caso ele esteja ativo por algum motivo, desabilite-o antes de criar as regras com o 
+Antes de iniciarmos qualquer configuração de firewall, na qual existe uma chance de perder acesso ao servidor, garanta
+que você ainda consegue acessar o console de alguma forma para eventuais correções. Valide que o ufw está inativo por
+meio do comando `sudo ufw status`. Caso ele esteja ativo por algum motivo, desabilite-o antes de criar as regras com o
 comando `sudo ufw disable`.
+
 ```sh
 root@ubuntu-s-1vcpu-1gb-nyc1-01:~# sudo ufw status
 Status: inactive
 ```
 
 No script abaixo existem comentários para o que cada porta representa.
+
 ```sh
 # Variável que representa o seu endereço IP público ou o IP que fecha a conexão com o Zabbix
 MEU_IP="200.100.50.25"
@@ -191,23 +202,24 @@ sudo ufw status verbose
 
 ## Boas práticas para organização via grupos
 
-A separação de hosts e templates por grupos auxilia na ornigação do ambiente, além de facilitar ações massivas de mudança 
-de configuração nos hosts. E se você pretende usar um *Grafana* depois, você irá me agradecer por já te fazer pensar em 
-algo um pouco mais organizado desde o início. 
+A separação de hosts e templates por grupos auxilia na ornigação do ambiente, além de facilitar ações massivas de mudança
+de configuração nos hosts. E se você pretende usar um _Grafana_ depois, você irá me agradecer por já te fazer pensar em
+algo um pouco mais organizado desde o início.
 
-Este é um ponto que depende, e varia muito, de ambiente para ambiente e quiçá você irá apenas saber qual é o melhor formato 
+Este é um ponto que depende, e varia muito, de ambiente para ambiente e quiçá você irá apenas saber qual é o melhor formato
 para o seu caso de uso durante o dia a dia. Mas, ainda sim, existem coisas que são padrões em praticamente qualquer instalação.
 
-Neste momento inicial, preocupe-se mais com os grupos de hosts, pois não começamos a criar templates do zero ainda. Para criar 
-grupos, navegue até *Dados coletados -> Grupos de Hosts*.
+Neste momento inicial, preocupe-se mais com os grupos de hosts, pois não começamos a criar templates do zero ainda. Para criar
+grupos, navegue até _Dados coletados -> Grupos de Hosts_.
 ![Blog0002Imagem0012](/images/blog0002-img0012.png)
 
-Aqui não tem muito segredo, ao clicar no botão **Criar grupo de hosts** um modal irá abrir e podemos preencher diretamente 
+Aqui não tem muito segredo, ao clicar no botão **Criar grupo de hosts** um modal irá abrir e podemos preencher diretamente
 o nome do grupo.
 ![Blog0002Imagem0013](/images/blog0002-img0013.png)
 
-No Zabbix é possível criar hierarquias entre grupos utilizando o separador **/**. Ou seja, podemos ter o grupo BRASIL e o 
+No Zabbix é possível criar hierarquias entre grupos utilizando o separador **/**. Ou seja, podemos ter o grupo BRASIL e o
 subgrupo BRASIL/SAO_PAULO. O que eu recomendo aqui é:
+
 - **Crie grupos para separar por localização geográfica**: pontos de presença, data-centers, cidades, estados (LOCAL/SUBLOCAL)
 - **Crie grupos para seprar por tipo de equipamento**: roteadores, switches, servidores (EQUIPAMENTO/TIPO)
 - **Crie grupos para separar por sistema operacional**: Linux, Windows, Proxmox (SO/NOME)
@@ -217,10 +229,10 @@ subgrupo BRASIL/SAO_PAULO. O que eu recomendo aqui é:
 
 ## Habilitar o inventário automático de hosts
 
-O inventário automático irá permitir que o Zabbix documente os hosts com base nos itens coletados via monitoramento, 
+O inventário automático irá permitir que o Zabbix documente os hosts com base nos itens coletados via monitoramento,
 isso facilita bastante a vida, principalmente quando desejamos filtrar hosts por versão de software ou hardware.
 
-Para isso, navegue até *Administração -> Geral -> Outros* e altere a opção *Modo padrão de inventário de host* para **Automático**
+Para isso, navegue até _Administração -> Geral -> Outros_ e altere a opção _Modo padrão de inventário de host_ para **Automático**
 ![Blog0002Imagem0014](/images/blog0002-img0014.png)
 
 ---
@@ -232,21 +244,24 @@ Créditos: [InitMax](https://www.initmax.com/wiki/zabbix-rebranding)
 ### Trocando as Logos
 
 Para fazermos a personalização do servidor precisamos de três imagens com os seguintes tamanhos:
+
 - Logo principal: 114x30px
 - Logo do menu lateral: 91x24px
 - Logo do menu lateral minimizado: 24x24 px
 
 Para trocarmos as imagens, primeiro, crie dois diretórios para salvar nossas modificações:
+
 ```sh
 sudo mkdir -p /usr/share/zabbix/local/conf
 sudo mkdir -p /usr/share/zabbix/rebranding
 ```
 
-Depois faça upload das imagens no diretório *rebranding*, você pode fazer via SCP ou usar algum utilitário gráfico, 
+Depois faça upload das imagens no diretório _rebranding_, você pode fazer via SCP ou usar algum utilitário gráfico,
 como o WinSCP.
 
-Crie o arquivo responsável por realizar a troca das imagens usando o comando abaixo, lembre-se de alterar **nome_da_imagem.png** 
+Crie o arquivo responsável por realizar a troca das imagens usando o comando abaixo, lembre-se de alterar **nome_da_imagem.png**
 para o valor real do nome do arquivo que foi realizado o upload:
+
 ```sh
 echo "<?php
 return [

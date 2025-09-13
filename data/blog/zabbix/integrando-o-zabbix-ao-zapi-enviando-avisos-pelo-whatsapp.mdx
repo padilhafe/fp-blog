@@ -1,0 +1,232 @@
+---
+title: 'Integrando o Zabbix ao Z-API: Recebendo avisos pelo Whatsapp'
+date: '2025-02-03'
+tags: ['zabbix']
+draft: false
+summary: 'Neste artigo, demonstro como configurar o Zabbix para se integrar ao Z-API e enviar notificações direto pelo WhatsApp.'
+---
+
+# Índice
+
+- [Índice](#índice)
+- [Introdução](#introdução)
+  - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
+- [Z-API](#z-api)
+  - [Configuração de uma instância](#configuração-de-uma-instância)
+  - [Descobrindo o número dos destinatários](#descobrindo-o-número-dos-destinatários)
+- [Configuração no Zabbix](#configuração-no-zabbix)
+  - [Configurando a Mídia](#configurando-a-mídia)
+  - [Configurando o destinatário](#configurando-o-destinatário)
+  - [Configurando o alerta](#configurando-o-alerta)
+
+---
+
+# Introdução
+
+Receber alertas em tempo real é essencial para identificar problemas rapidamente e evitar que falhas impactem a operação. O zabbix, com sua capacidade de monitorar servidores, redes e aplicações, fornece alertas imediatos ao detectar problemas, possibilitando que as equipes ajam para corrigí-los.
+
+No entando, a eficácia desses alertas dependem de como eles chegam até os responsáveis. É aqui que a integração com o **Z-API** faz a diferença: ela permite que as notificações do Zabbix sejam enviadas diretamente pelo Whatsapp, garantindo que as equipes sejam avisadas instantaneamente, mesmo fora do ambiente de trabalho. Essa agilidade reduz o tempo de resposta, aumenta a disponibilidade dos serviços e protege a continuidade dos negócios.
+
+Receber alertas rápidos e precisos não é apenas uma conveniência - é uma necessidade para manter a estabilidade e a segurança das operações.
+
+## Link para o tutorial em vídeo
+
+<YouTube id="vYc1qDx7ids" />
+
+# Z-API
+
+A Z-API é uma plataforma que permite integrar sistemas e aplicações diretamente ao WhatsApp, facilitando a automação de mensagens e notificações. Com uma API simples, ela possibilita que ferramentas de monitoramento, como o Zabbix, enviem alertas instantâneos para equipes de suporte, agiliznado a resposta a incidentes e reduzindo o tempo de inatividade.
+
+> E antes de mais nada quero deixar claro que não estou sendo patrocinado pela plataforma, sou apenas um usuário, com mais de um ano de uso, satisfeito com o serviço prestado por ela.
+
+A Z-API tem um custo mensal de R$ 99,90 mas é possível realizar o teste durante dois dias, tempo mais que suficiente para validar o funcionamento do Zabbix no seu ambiente.
+
+**Só um adendo**, como não é uma integração oficial, utilizando a API da Meta, existe a possibilidad ede perda do número utilizado caso seja identificado ações de bot ou spam. Existem diversos artigos na internet, inclusive na [documentação](https://developer.z-api.io/tips/blockednumbernew) da própria Z-API dando discas de como evitar a perda do número.
+
+## Configuração de uma instância
+
+Ao fazer login na plataforma da Z-API, no menu lateral selecione a opção **Instâncias Web** e clique no botão **Adicionar**:
+![Dashboard de Instâncias: Z-API](/images/image.png)
+
+Preencha com o nome da instância, o restante você não precisa preencher:
+![Cadastrando uma nova instância no Z-API](/images/image-1.png)
+
+Depois de criada, clique na instância para abrir a página de informações dela, você precisará salvar as informações de:
+
+- **ID da Instância**: a partir de agora, essa variável será referência como `$ID_INSTANCIA` ao longo do artigo.
+- **Token da Instância**: a partir de agora, essa variável será referênciada como `$TOKEN_INSTANCIA` ao longo do artigo.
+  ![Dados da Instância no Z-API](/images/image-2.png)
+
+> Não esqueça de conectar seu número ao WhatsApp Web da Z-API, para conseguir enviar as mensagens.
+
+Você também deve restringir o acesso da API a endereços IP específicos a partir da tela de segurança:
+![Lista de endereços IPs que podem usar o serviço da Z-API](/images/image-3.png)
+
+> Gere também o **Token de Segurança**, opção que está logo abaixo dos endreços IP. O mesmo será referenciado como `$TOKEN_SEGURANCA` ao longo do artigo.
+
+## Descobrindo o número dos destinatários
+
+Quando formos enviar as mensagens par aum número, vamos usar o formato `DDIDDDNUMERO` (sem o nono digíto), por exemplo: 551199999999.
+
+Quando formos enviar mensagens para um grupo, será necessário descobrir o ID do grupo. Conseguimos fazer isso diretamente pelo terminal, rodando o comando abaixo:
+
+```sh
+# Ambiente Linux
+curl -X GET https://api.z-
+api.io/instances/$ID_INSTANCIA/token/$TOKEN_INSTANCIA/chats \
+-H "Content-Type: application/json" \
+-H "Client-Token: $TOKEN_SEGURANCA"
+
+# Ambiente Windows/PowerShell
+Invoke-RestMethod -Uri “https://api.z-api.io/instances/$ID_INSTANCIA/token/$TOKEN_INSTANCIA/chats” -Headers @{“Content-Type” = “application/json”; “Client-Token” = “$TOKEN_SEGURANCA” } -Method Get
+```
+
+> Não esqueça de substituir as variáveis pelos valores do seu ambiente.
+
+Na saída do comando, procure pelos valores da chave **phone** dos grupos.
+
+# Configuração no Zabbix
+
+Se sua versão do Zabbix for 7 ou superior, você pode importar diretamente a mídia do [meu repositório público de Zabbix](https://github.com/padilhafe/zabbix-utils/blob/main/zbx_export_mediatypes_zapi.yaml) e apenas configurar com os valores do seu ambiente.
+
+Caso esteja usando um Zabbix inferior a versão 7, será obrigatório a configuração manual.
+
+## Configurando a Mídia
+
+No Zabbix, vá até **Alertas -> Tipos de Mídia**:
+![Tipos de Mídia](/images/image-5.png)
+
+Clique no botão _Criar tipo de Mídia_ e preencha com as seguintes informações:
+
+- **Nome**: Z-API
+- **Tipo**: Webhook
+- **Parâmetros**:
+  - **message**: `{ALERT.MESSAGE}`
+  - **phone**: `{ALERT.SENDTO}`
+  - **id**: o ID da sua instância Z-API
+  - **i_token**: o Token da sua instância Z-API
+  - **s_token**: o Token de segurança da sua instância
+  - **endpoint**: send-text
+
+E adicione o `Script` abaixo:
+
+```js
+try {
+  Zabbix.Log(4, 'Z-API Webhook script started')
+
+  var result = {
+      tags: {
+        endpoint: 'Z-API Webhook',
+      },
+    },
+    params = JSON.parse(value),
+    url =
+      'https://api.z-api.io/instances/' +
+      params.id +
+      '/token/' +
+      params.i_token +
+      '/' +
+      params.endpoint,
+    req = new HttpRequest(),
+    payload = {},
+    resp
+
+  Zabbix.Log(4, 'Z-API Webhook URL: ' + url)
+  req.addHeader('Content-Type: application/json')
+  req.addHeader('Client-Token: ' + params.s_token)
+
+  payload.phone = params.phone
+  payload.message = params.message
+
+  Zabbix.Log(4, 'Z-API Webhook Payload: ' + JSON.stringify(payload))
+
+  resp = req.post(url, JSON.stringify(payload))
+
+  Zabbix.Log(4, 'Z-API Webhook HTTP Status: ' + req.getStatus())
+  Zabbix.Log(4, 'Z-API Webhook Response: ' + resp)
+
+  if (req.getStatus() != 200) {
+    throw 'Response code: ' + req.getStatus()
+  }
+
+  if (resp) {
+    resp = JSON.parse(resp)
+  } else {
+    throw 'Empty response from server'
+  }
+} catch (error) {
+  Zabbix.Log(4, 'Z-API Webhook issue creation failed json: ' + JSON.stringify(payload))
+  Zabbix.Log(4, 'Z-API Webhook issue creation failed: ' + error)
+
+  result = {}
+}
+
+return JSON.stringify(result)
+```
+
+![Mídia Z-API](/images/image-4.png)
+
+Por fim na aba **Modelo de Mensagem**, adicione um modelo para incidentes e outro para recuperação:
+
+- **Incidente**
+
+```json
+Problema: {EVENT.NAME}
+
+Problema iniciou as {EVENT.TIME} em {EVENT.DATE}
+Título: {EVENT.NAME}
+Host: {HOST.NAME}
+Severidade: {EVENT.SEVERITY}
+Dados extras: {EVENT.OPDATA}
+ID: {EVENT.ID}
+```
+
+- **Recuperação**
+
+```json
+Resolvido: {EVENT.NAME}
+
+Problema resolvido as {EVENT.RECOVERY.TIME} - {EVENT.RECOVERY.DATE}
+Duração total: {EVENT.DURATION}
+Host: {HOST.NAME}
+Severidade: {EVENT.SEVERITY}
+ID:  {EVENT.ID}
+```
+
+O assunto da mensagem pode ser deixado em branco. Ao final, você terá dois modelos:
+![Modelos de Notificação](/images/image-6.png)
+
+## Configurando o destinatário
+
+Para configurarmos o destinatário da mensagem, vamos até o gerenciamento de usuários, em **Usuários -> Usuários**:
+![Gerenciamento de Usuários do Zabbix](/images/image-7.png)
+
+Vou clicar no usuário `Admin`, mas pode ser qualquer outro, e selecionar a aba `Mídia` e clicar para adicionar uma nova mídia:
+![Aba mídia do usuário](/images/image-8.png)
+
+Ai basta alterar as seguintes informações:
+
+- **Tipo**: Z-API
+- **Enviar para**: o número ou o ID do grupo do Whatsapp
+  ![Configuração de nova Mídia](/images/image-9.png)
+
+Clique no botão **Adicionar** do modal da mídia e no botão de **Atualizar** da aba de mídia.
+
+## Configurando o alerta
+
+Agora vá em **Alertas -> Ações -> Ações de Trigger** e clique no botão **Criar ação**, no canto superior direito:
+![Tela de ações de trigger](/images/image-10.png)
+
+Existem diversas formas de configurar a ação, incluindo limitações de envio de mensagem. Para o tutorial, vou me ater ao básico, conforme a imagem abaixo:
+![Configuração de nova ação](/images/image-11.png)
+
+Clique na aba de **Operações** e clique para **adicionar** uma nova opração:
+![Aba Operações](/images/image-12.png)
+
+Adicione a operação para o Usuário que cadastro a mídia do Z-API e informe para usá-la na operação:
+![Configuração da Operação](/images/image-13.png)
+
+Clique em adicionar e faça o mesmo procedimento para a operação de recuperação:
+![Configuração da Operação de Recuperação](/images/image-14.png)
+
+Adicione a nova ação e a configuração está pronta! Os próximos incidents que casarem com a condição da ação já serão enviados pelo Z-API!

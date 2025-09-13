@@ -1,0 +1,184 @@
+---
+title: 'Integrando Terraform com Proxmox para Infraestrutura como Código'
+date: '2025-09-13'
+tags: ['virtualizacao']
+draft: false
+summary: 'Aprenda como usar Terraform para provisionar sua infraestrutura virtual do Proxmox.'
+---
+
+# Índice
+
+- [Índice](#índice)
+- [Introdução](#introdução)
+- [Como posso usar IaC no Proxmox?](#como-posso-usar-iac-no-proxmox)
+  - [Terraform no Proxmox – Provider Telmate/Proxmox](#terraform-no-proxmox--provider-telmateproxmox)
+  - [Como configurar?](#como-configurar)
+- [Preparando o Proxmox](#preparando-o-proxmox)
+- [Primeira VM com Terraform](#primeira-vm-com-terraform)
+
+# Introdução
+
+A Infraestrutura como Código (IaC) é uma prática moderna de DevOps que permite definir, provisionar e gerenciar infraestrutura de TI por meio de arquivos de configuração, em vez de processos manuais.
+
+No lugar de cliques no painel do Proxmox, toda a configuração é registrada em código, possibilitando:
+
+- **Reprodutibilidade** → qualquer ambiente pode ser recriado exatamente da mesma forma.
+- **Versionamento** → o estado da infraestrutura fica armazenado em Git.
+- **Automação** → servidores, VMs e containers são criados automaticamente.
+- **Escalabilidade** → provisionar dezenas de máquinas torna-se tão fácil quanto provisionar uma.
+
+# Como posso usar IaC no Proxmox?
+
+Com certeza a ferramenta mais conhecida e utilizada para configuração de ambientes via código é o [Terraform](https://developer.hashicorp.com/terraform).
+
+O Terraform, criado pela HashiCorp, é um orquestrador de infraestrutura que permite descrever recursos em arquivos declarativos, geralmente com a extensão .tf. Ele é agnóstico de provedor, ou seja, pode gerenciar desde recursos de nuvem pública (AWS, Azure, GCP) até ambientes on-premises, como VMware e Proxmox.
+
+**Principais características do Terraform:**
+
+- **Linguagem declarativa (HCL)** → você descreve o estado desejado da infraestrutura, e o Terraform se encarrega de aplicar as mudanças.
+- **Idempotência** → se a infraestrutura já está no estado desejado, o Terraform não recria nada; apenas aplica alterações necessárias.
+- **Plano de execução (terraform plan)** → mostra o que será criado, alterado ou destruído antes de aplicar.
+- **Controle de estado** → mantém um arquivo de estado (terraform.tfstate) para rastrear os recursos gerenciados.
+- **Integração com Git** → os arquivos podem ser versionados, facilitando colaboração e auditoria.
+- **Extensibilidade por providers** → a comunidade pode criar provedores para diferentes plataformas, ampliando as possibilidades de automação.
+
+## Terraform no Proxmox – Provider Telmate/Proxmox
+
+Para usar o Terraform no Proxmox, existe o provider [Telmate/Proxmox](https://github.com/Telmate/terraform-provider-proxmox), mantido pela comunidade. Ele permite criar, clonar e gerenciar VMs (QEMU) e containers (LXC) diretamente no cluster.
+
+Com esse provider é possível:
+
+- **Clonar templates** → criar VMs novas a partir de templates existentes.
+- **Configurar recursos de hardware** → definir CPU, memória, discos e interfaces de rede.
+- **Gerenciar containers LXC** → criar ambientes leves diretamente via código.
+- **Customizar inicialização** → passar parâmetros via Cloud-Init para personalizar hostname, usuário, rede e chaves SSH.
+- **Automatizar escalabilidade** → subir múltiplas VMs de forma consistente, sem cliques manuais no painel do Proxmox.
+
+## Como configurar?
+
+A primeira coisa que você precisa fazer é instalar o Terraform no seu computador. Para isso, pode seguir as instruções de [instalação](https://developer.hashicorp.com/terraform/install) para o seu sistema operacional.
+
+Depois, precisamos preparar nosso Proxmox com as imagens de cloud-init dos sistemas operacionais e configurar o usuário que o Terraform irá usar para se conectar com a API do Proxmox para realizar as configurações.
+
+Por fim, criamos nossos arquivos `.tf` com a definição da nossa estrutura e deixamos para o Terraform fazer o resto. Mãos a obra então!
+
+> A partir deste ponto, vou considerar que você já instalou o Terraform para o seu sistema.
+
+# Preparando o Proxmox
+
+A primeira coisa que precisamos fazer é preparar nosso Proxmox com as imagens cloud-init, que são as imagens que o Terraform irá usar para criar as máquinas virtuais (será o equivalente a nossas imagens ISO, que instalamos manualmente).
+
+Para isso, deixei no meu repositório do GitHub o [script](https://github.com/padilhafe/scripts/blob/main/proxmox/criar_imagens_cloud_init.sh) que realiza essa configuração de forma automática para o Ubuntu 22.04, Ubuntu 24.04, Debian 12 e Debian 13.
+
+Você irá baixá-lo na máquina, dar permissão de execução e rodar o script. Mas antes, no seu Proxmox, crie uma pool de recursos chamada `cloud_init`. Para isso, vá em **Datacenter -> Permissions -> Pools**:
+![Criação de Pools no Proxmox](/images/18/image.png)
+
+Depois de criado, baixe o script, **mas ainda não o rode**:
+
+```sh
+wget https://raw.githubusercontent.com/padilhafe/scripts/refs/heads/main/proxmox/criar_imagens_cloud_init.sh
+```
+
+Abra o arquivo com seu editor de textos favoritos, vamos focar nas primeiras linhas que são as variáveis do ambiente:
+
+```sh
+
+# Configurações fixas
+IMAGES_PATH="/var/lib/vz/images"
+VM_RESOURCE_POOL="cloud_init"
+QEMU_CPU_MODEL="x86-64-v2-AES"
+VM_CPU_SOCKETS=1
+VM_CPU_CORES=1
+VM_MEMORY=1024
+VM_BRIDGE="vmbr0"
+VM_TAG="30"
+VM_MTU=1
+CLOUD_INIT_IP="dhcp"
+CLOUD_INIT_NAMESERVER="8.8.8.8"
+CLOUD_INIT_USER="ciuser"
+CLOUD_INIT_PASSWORD="cipass"
+NODE_ID=0
+```
+
+O que você precisa mudar aqui:
+
+- **VM_BRIDGE**: adicione o nome da sua bridge ou interface de uplink para as máquinas virtuais.
+- **VM_TAG**: informe a tag de vlan que usa para a rede de dados das VMs. Se não usa VLAN, mantenha como 0.
+- **CLOUD_INIT_IP**: o ideal para a automação funcionar bem é você ter um DHCP na rede de destino, portanto, nem vou considerar a configuração com IP fixo.
+- **CLOUD_INIT_NAMESERVER**: altere conforme o DNS da sua rede.
+- **CLOUD_INIT_USER**: será o usuário padrão das máquinas virtuais.
+- **CLOUD_INIT_PASSWORD**: será a senha do usuário.
+- **NODE_ID**: usado para calcular o ID do template de VM, altere sempre que rodar em um host diferente do mesmo cluster. Use apenas um digito.
+
+Feito as alterações, basta rodar o script:
+
+```sh
+chmod +x criar_imagens_cloud_init.sh
+./criar_imagens_cloud_init.sh
+```
+
+Ele irá baixar as imagens cloud init, criar o template e limpar os downloads, basta aguardar. Ao final, você terá o seguinte resultado na interface web do seu Proxmox:
+
+A primeira parte da preparação foi. Agora, precisamos criar o usuário que o Terraform irá usar para se conectar ao cluster Proxmox. Basta baixar e rodar o [script](https://github.com/padilhafe/scripts/blob/main/proxmox/terraform_user.sh) que também está disponível no GitHub. Neste não precisamos alterar nada.
+
+```sh
+wget https://raw.githubusercontent.com/padilhafe/scripts/refs/heads/main/proxmox/terraform_user.sh
+chmod +x terraform_user.sh
+./terraform_user.sh
+```
+
+Ao final do script você deverá salvar o Token da API, ele será a "senha" que o Terraform irá usar para a conexão e não é possível recuperar.
+
+> Se você perder, terá que excluir o token e o usuário Terraform via interface Web do Proxmox ou usando os seguintes comandos: `pveum user token del terraform-prov@pve` e `pveum user del terraform-prov@pve`.
+
+De posse da chave de API em mãos, você irá precisar salvar duas variáveis de ambiente no seu computador, que é o usuário Proxmox e o respectivo token:
+
+```sh
+# Linux/macOS
+export PM_API_TOKEN_ID='terraform-prov@pve!terraform-token'
+export PM_API_TOKEN_SECRET='cole seu token aqui'
+
+# Windows
+setx PM_API_TOKEN_ID "terraform-prov@pve!terraform-token"
+setx PM_API_TOKEN_SECRET "cole_seu_token_aqui"
+```
+
+> No Linux, considere fazer os exports diretamente no seu .bashrc ou .zshrc, assim, não precisa ficar fazendo o export toda vez que abrir o terminal.
+
+Com isso, concluímos a preparação do Proxmox, vamos agora a configuração da nossa primeira VM via Terraform.
+
+# Primeira VM com Terraform
+
+Clone o meu repositório de exemplos do Terraform para usa máquina (você irá precisar ter o `Git` instalado):
+
+```sh
+git clone https://github.com/padilhafe/terraform-exemplos
+```
+
+Abra a pasta `proxmox/exemplo1` com algum editor que mostra o sistema de arquivos, como o Visual Studio Code.
+
+O que você deverá fazer:
+
+- No arquivo `main.tf`, na chave `pm_api_url` troque o IP pelo IP do seu servidor Proxmox.
+- No arquivo `resource.tf`, se quiser usar IP Fixo, descomente a primeira linha de ipconfig0 e comente a segunda.
+- No arquivo `terraform.tfvars` configure as variáveis conforme informações do seu ambiente. Se estiver com dúvidas de como fazer, provavelmente já terá um vídeo no meu canal no qual explico mais a fundo (se não tiver, só aguardar mais um ou dois dias e ele estará disponível).
+
+Com tudo configurado, vamos inicializar o Terraform:
+
+```sh
+terraform init
+```
+
+Vamos validar o que será alterado/criado:
+
+```sh
+terraform plan
+```
+
+E por fim, vamos executar a modificação:
+
+```sh
+terraform apply
+```
+
+Ele irá trazer novamente o resumo do que será alterado, basta digitar `yes` e pressionar enter. A máquina será provisionada via IaC!

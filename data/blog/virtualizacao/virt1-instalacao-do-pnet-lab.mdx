@@ -1,5 +1,5 @@
 ---
-title: 'Instalação do PNETLab para criar ambientes virtuais de redes e infraestrutura' 
+title: 'Instalação do PNETLab para criar ambientes virtuais de redes e infraestrutura'
 date: '2025-02-10'
 tags: ['virtualizacao']
 draft: false
@@ -7,6 +7,8 @@ summary: O artigo demonstra como realizar a instalação do PNETLab para realiza
 ---
 
 ## Índice
+
+- [Índice](#índice)
 - [Introdução](#introdução)
   - [Link para o tutorial em vídeo](#link-para-o-tutorial-em-vídeo)
 - [Download do VMWare Workstation Pro](#download-do-vmware-workstation-pro)
@@ -17,16 +19,17 @@ summary: O artigo demonstra como realizar a instalação do PNETLab para realiza
   - [Usando o iShare2](#usando-o-ishare2)
 - [Primeiro Laboratório](#primeiro-laboratório)
 
-
 ## Introdução
+
 O **PNETLab** é uma plataforma de simulação e emulação de redes baseado no **EVE-NG**. Projetada para ambientes de treinamento e testes, ele permite a criação de laboratórios virutais para estudo de redes, segurança, automação. Suporta a emulação de dispositivos como: roteadores, switches, firewalls, servidores e hipervisores de diversos fabricantes.
 
-Diferente dos simuladores tradicionais, o **PNETLab** utiliza máquinas virtuais reais, proporcionando um ambiente próximo ao de produção. Além disso, oferece recursos como suporte a *KVM/QEMU*, integração com *Docker* e um painel web intuitivo para criação e gerenciamento de topologias.
+Diferente dos simuladores tradicionais, o **PNETLab** utiliza máquinas virtuais reais, proporcionando um ambiente próximo ao de produção. Além disso, oferece recursos como suporte a _KVM/QEMU_, integração com _Docker_ e um painel web intuitivo para criação e gerenciamento de topologias.
 
 Neste artigo, abordaremos a instalação do **PNETLab**, incluindo os requisitos necessários e primeiros passos para a configuração, uso e download das imagens dos equipamentos.
 
 ### Link para o tutorial em vídeo
-<YouTube id="dBZ5Y_cFSSY"/>
+
+<YouTube id="dBZ5Y_cFSSY" />
 
 ---
 
@@ -43,7 +46,6 @@ Após realizado o login, você deverá clicar no botão com o desenho de três n
 Na dashboard, clique em **My Downloads** e pesquise por **Workstation**. Clique em **VMWare Workstation Pro**. Se não aparecer nada, siga este [link](https://support.broadcom.com/group/ecx/free-downloads), o mesmo irá te direcionar para a página de free downloads.
 ![virt1-img3](/images/virt1-img3.png)
 
-
 Selecione a última versão disponível para sua plataforma, Windows ou Linux.
 ![virt1-img4](/images/virt1-img4.png)
 
@@ -52,7 +54,8 @@ Marque a caixa **I agree to the Terms and Conditions** (após ler os termos e co
 
 ### Instalação do VMWare Workstation Pro
 
-Caso você tenha Docker ou o WSL instalado no Windows, terá que desativá-los, pois não será possível usá-los junto do VMware Workstation. Para desativar, procure por *Ativar ou Desativar Recursos do Windows* no menu iniciar e desative as opções:
+Caso você tenha Docker ou o WSL instalado no Windows, terá que desativá-los, pois não será possível usá-los junto do VMware Workstation. Para desativar, procure por _Ativar ou Desativar Recursos do Windows_ no menu iniciar e desative as opções:
+
 - Plataforma Hipervisor do Windows
 - Virtual Machine Platform
 
@@ -68,18 +71,19 @@ Para realizar o download da última versão disponível do PNETLab, siga este [l
 
 ### Importando a VM do PNETLab
 
-Abra o VMware Workstation Pro e na barra de ferramentas clique em *File -> Open* ou utilize o atalho *CTRL + O*, procure pelo arquivo do `.ova` que baixou e abra ele.
+Abra o VMware Workstation Pro e na barra de ferramentas clique em _File -> Open_ ou utilize o atalho _CTRL + O_, procure pelo arquivo do `.ova` que baixou e abra ele.
 
-Dê um nome a VM do PNETLab e selecione o local que deseja salvar o disco rigido virtual da mesma. Após, clique em *Import* e aguarde a importação da máquina, mas ainda não a inicie.
+Dê um nome a VM do PNETLab e selecione o local que deseja salvar o disco rigido virtual da mesma. Após, clique em _Import_ e aguarde a importação da máquina, mas ainda não a inicie.
 ![virt1-img6](/images/virt1-img6.png)
 
-Selecione a VM na interface do Workstation Pro e clique em *Edit Virtual Machine Settings*. 
+Selecione a VM na interface do Workstation Pro e clique em _Edit Virtual Machine Settings_.
 ![virt1-img7](/images/virt1-img7.png)
 
 Os parâmetros que precisamos modificar são:
+
 - **Memory:** por padrão a máquina vem configurada com 8GB, ajuste conforme seu computador, recomendo ao menos 4GB de RAM para rodar os laboratórios. Quanto mais pesada a imagem que irá emular, mais RAM precisa ser alocada para o PNETLab;
-- **Processors:** altere o *Number of Processors* para 1 (ou 2 se usar placas x99 de dois sockets e tiver dois processadores instalados...) e ajuste o *Number of cores per processor* conforme seu computador. Habilite a opção **Virtualize Intel VT-x/EPT or AMD-V/RVI** (lembrando que estas extensões precisam ser habilitadas na BIOS do seu computador também).
-![virt1-img8](/images/virt1-img8.png)
+- **Processors:** altere o _Number of Processors_ para 1 (ou 2 se usar placas x99 de dois sockets e tiver dois processadores instalados...) e ajuste o _Number of cores per processor_ conforme seu computador. Habilite a opção **Virtualize Intel VT-x/EPT or AMD-V/RVI** (lembrando que estas extensões precisam ser habilitadas na BIOS do seu computador também).
+  ![virt1-img8](/images/virt1-img8.png)
 
 O restante das configurações você não precisa mexer. Clique em OK no final desta janela e inicie a máquina.
 
@@ -110,11 +114,13 @@ O [iShare2](https://github.com/ishare2-org/ishare2-cli) é uma ferramenta de com
 > Lembre-se sempre de utilizar imagens que você detenha os direitos de uso. Não me responsabilizo por eventuais processos ou danos decorrentes da utilização de produtos piratas.
 
 Para baixarmos o **iShare2**, executamos o comando abaixo:
+
 ```sh
 wget -O /usr/sbin/ishare2 https://raw.githubusercontent.com/ishare2-org/ishare2-cli/main/ishare2 && chmod +x /usr/sbin/ishare2 && ishare2
 ```
 
 Ou, se não houver o `wget` instalado no sistema:
+
 ```sh
 curl -O /usr/sbin/ishare2 https://raw.githubusercontent.com/ishare2-org/ishare2-cli/main/ishare2 && chmod +x /usr/sbin/ishare2 && ishare2
 ```
@@ -124,6 +130,7 @@ O script irá auxiliar na instalção da ferramenta. Ele irá baixar as dependê
 ### Usando o iShare2
 
 O fluxo de uso do iShare2 se resume em:
+
 - Procurar por uma imagem, usando o comando: `ishare2 search "nome_imagem"`
 - Baixar a imagem (pull), através do comando: `ishare2 pull <plataforma> <id_imagem>`
 
@@ -143,7 +150,7 @@ Verificamos que é uma imagem QEMU e com ID 904, então executamos `ishare2 pull
 Acesse a interface web do iShare, pelo mesmo endereço IP que foi usado para conexão do SSH. Se for o primeiro acesso, terá que optar entre **Online Mode** e **Offline Mode**, aconselho usar o modo offline.
 ![virt1-img18](/images/virt1-img18.png)
 
-Realize login usando o usuário **admin** e senha **pnet**, para usar o *default console* você precisa baixar e instalar o programa disponível neste [link](https://www.eve-ng.net/index.php/download/#DL-WIN), caso contrário, altere para *HTML Console*.
+Realize login usando o usuário **admin** e senha **pnet**, para usar o _default console_ você precisa baixar e instalar o programa disponível neste [link](https://www.eve-ng.net/index.php/download/#DL-WIN), caso contrário, altere para _HTML Console_.
 ![virt1-img19](/images/virt1-img19.png)
 
 Clique no botão de **add new lab**

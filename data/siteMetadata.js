@@ -73,15 +73,17 @@ const siteMetadata = {
       metadata: '0',
       // theme example: light, dark, dark_dimmed, dark_high_contrast
       // transparent_dark, preferred_color_scheme, custom
-      theme: 'light',
+      theme: 'preferred_color_scheme', // Detecta automaticamente o tema do sistema
       // theme when dark mode
-      darkTheme: 'transparent_dark',
+      darkTheme: 'noborder_dark', // Tema escuro sem bordas
       // If the theme option above is set to 'custom`
       // please provide a link below to your custom theme css file.
       // example: https://giscus.app/themes/custom_example.css
       themeURL: '',
-      // This corresponds to the `data-lang="en"` in giscus's configurations
-      lang: 'en',
+      // This corresponds to the `data-lang="pt"` in giscus's configurations
+      lang: 'pt', // Mudado para português
+      // Input position: top or bottom
+      inputPosition: 'bottom',
     },
   },
   search: {

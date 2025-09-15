@@ -45,7 +45,7 @@ export default function PostLayout({
   children,
   allPosts = [],
 }: LayoutProps) {
-  const { filePath, path, slug, date, title, tags, toc, body, readingTime } = content
+  const { filePath, path, slug, date, title, tags, toc, readingTime } = content
   const basePath = path.split('/')[0]
   const postUrl = `${siteMetadata.siteUrl}/${path}`
 

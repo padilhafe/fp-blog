@@ -1,0 +1,334 @@
+---
+title: 'Tutorial de como instalar o GLPI 10 no Debian 13'
+date: '2025-09-15'
+tags: ['linux']
+draft: false
+summary: Neste tutorial, você aprenderá como instalar e configurar o GLPI 10 no Debian 13, incluindo todos os pré-requisitos, instalação de dependências, configuração do banco de dados e ajustes essenciais para garantir o funcionamento correto do sistema de gestão de ativos e helpdesk.
+---
+
+# Índice
+
+- [Índice](#índice)
+- [Introdução](#introdução)
+- [Visão Geral da Instalação do GLPI](#visão-geral-da-instalação-do-glpi)
+- [Instalação](#instalação)
+  - [Preparando o ambiente](#preparando-o-ambiente)
+  - [Instalando o Banco de Dados](#instalando-o-banco-de-dados)
+  - [Preparando o Sistema Operacional](#preparando-o-sistema-operacional)
+  - [Configurando o PHP](#configurando-o-php)
+  - [Baixando e Configurando o GLPI](#baixando-e-configurando-o-glpi)
+  - [Configuração do Apache](#configuração-do-apache)
+
+# Introdução
+
+O GLPI (Gestionnaire Libre de Parc Informatique) é uma poderosa solução open source para gestão de ativos de TI e helpdesk. Bastante utilizado em empresas, órgãos públicos e instituições de ensino, o GLPI permite o controle eficiente de inventário de hardware e software, gerenciamento de chamados, contratos, licenças, usuários e muito mais.
+
+Com uma interface web intuitiva e recursos avançados de customização, o GLPI facilita o acompanhamento de demandas, a organização dos processos de suporte e a tomada de decisões estratégicas na área de tecnologia da informação. Neste tutorial, você aprenderá como instalar e configurar o GLPI 10 no Debian 13.
+
+# Visão Geral da Instalação do GLPI
+
+A instalação do GLPI envolve a preparação de diversos componentes que trabalham em conjunto para garantir o funcionamento estável da aplicação. De forma resumida, os passos principais serão:
+
+- **Banco de Dados (MariaDB/MySQL)**: onde ficarão armazenadas todas as informações do GLPI, como chamados, usuários, inventário, contratos e registros de auditoria.
+- **Servidor Web (Apache)**: responsável por servir a interface web do GLPI e processar as requisições dos usuários.
+- **PHP e Extensões**: o GLPI é escrito em PHP, portanto é necessário instalar e configurar o PHP juntamente com seus módulos essenciais (como LDAP, GD, XML, ZIP, entre outros).
+- **Download e Instalação do GLPI**: obter a versão estável mais recente do projeto, extrair e organizar os diretórios recomendados (logs, arquivos e cache).
+
+> Por questões de simplicidade, vamos realizar a instalação centralizada (na qual o banco de dados e a aplicação residem no mesmo servidor) e sem suporte a SSL.
+
+# Instalação
+
+Você pode ter acesso ao script completo neste [repositório](https://github.com/padilhafe/scripts/blob/main/instaladores/glpi.sh).
+
+## Preparando o ambiente
+
+O primeiro passo é definir as variáveis de ambiente que os comandos irão referenciar, assim, informações que são configuradas em múltiplos locais (como as credenciais do banco de dados) só precisam ser definidas uma vez:
+
+```sh
+GLPI_DB="glpi_db"
+GLPI_DB_HOST="localhost"
+GLPI_DB_USER="glpi_user"
+GLPI_DB_PASSWORD="glpi_password"
+GLPI_HOST="localhost"
+SERVER_NAME="glpi.seudominio.com.br ou endereço_ip_servidor"
+SERVER_PORT="80"
+PHP_INI="/etc/php/8.4/apache2/php.ini"
+GLPI_VERSION="10.0.20"
+```
+
+> Não esqueça de mudar as informações das variáveis conforme conforme seu ambiente. Principalmente a senha do banco de dados, utilize uma senha segura!
+
+E garantir que o servidor está com repositório de pacotes e binários atualizados:
+
+```sh
+sudo apt update -y && sudo apt upgrade -y
+```
+
+## Instalando o Banco de Dados
+
+Vamos usar o MariaDB como banco de dados, portanto, vamos instalar os pacotes necessários:
+
+```sh
+sudo apt install -y mariadb-server mariadb-client mysql-common
+```
+
+E configurar o banco de forma segura:
+
+```sh
+sudo mysql -u root <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${GLPI_DB_PASSWORD}';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+```
+
+> O comando acima executa os mesmos passos do `mysql_secure_installation`/`mariadb-secure-installation`, mas optei por realizar de forma manual para configurar a senha do usuário root do banco, como a mesma do GLPI. Além de ficar mais elegante do que responder um monte de yes e no.
+
+Vamos carregar as informações de fuso horário no banco de dados (o GLPI as utiliza):
+
+```sh
+mariadb-tzinfo-to-sql /usr/share/zoneinfo | sudo mysql -u root -p${GLPI_DB_PASSWORD} mysql
+```
+
+E criar o banco de dados do GLPI e o usuário de acesso:
+
+```sh
+sudo mysql -u root -p${GLPI_DB_PASSWORD} <<EOF
+CREATE DATABASE IF NOT EXISTS \`${GLPI_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE USER IF NOT EXISTS '${GLPI_DB_USER}'@'${GLPI_HOST}' IDENTIFIED BY '${GLPI_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${GLPI_DB}\`.* TO '${GLPI_DB_USER}'@'${GLPI_HOST}';
+GRANT SELECT ON mysql.time_zone_name TO '${GLPI_DB_USER}'@'${GLPI_HOST}';
+FLUSH PRIVILEGES;
+EOF
+```
+
+E por fim, vamos habilitar o MariaDB para iniciar junto do sistema e reiniciar o serviço:
+
+```sh
+sudo systemctl enable mariadb
+sudo systemctl restart mariadb
+```
+
+## Preparando o Sistema Operacional
+
+Antes de instalar o GLPI, precisamos preparar o ambiente com o Apache (servidor web) e algumas dependências de sistema que serão utilizadas durante a instalação:
+
+```sh
+sudo apt install -y \
+	apache2 \
+	mariadb-client \
+	aptitude \
+	wget \
+	lsb-release \
+	ca-certificates \
+	apt-transport-https \
+	gnupg \
+	libkrb5-dev \
+	build-essential
+```
+
+> Aqui, além do Apache2, incluímos ferramentas auxiliares como wget (para baixar arquivos), aptitude (gestor de pacotes avançado), gnupg (para chaves GPG) e bibliotecas de desenvolvimento como build-essential e libkrb5-dev, necessárias para compilar extensões do PHP.
+
+Como o GLPI é desenvolvido em PHP, ele exige várias extensões para funcionar corretamente. Vamos instalar todas de uma vez:
+
+```sh
+sudo apt install -y php php-{apcu,cli,common,curl,gd,ldap,mysql,xmlrpc,xml,mbstring,bcmath,intl,zip,redis,bz2} libapache2-mod-php php-soap php-cas php-pear php-dev
+```
+
+> Esse comando já cobre os módulos essenciais como php-mysql (integração com o banco), php-ldap (para autenticação com Active Directory/LDAP), php-gd (para geração de imagens e gráficos), php-zip (para uploads compactados), php-apcu (cache) e muitos outros.
+
+A versão padrão do PHP nos repositórios do Debian 13 não tem disponível mais a extensão php-imap, necessária para o GLPI usar envio de email. Para resolvermos isso, vamos adicionar o repositório PHP do Sury.
+
+```sh
+wget -qO- https://packages.sury.org/php/README.txt | sudo bash -x
+```
+
+E vamos usar o aptitude para instalar o gerenciador de pacotes do PHP que tem a extensão do protocolo IMAP disponível:
+
+```sh
+wget -qO- https://packages.sury.org/php/README.txt | sudo bash -x
+sudo aptitude update
+sudo aptitude safe-upgrade -y
+sudo aptitude install -y libc-client-dev
+sudo pecl channel-update pecl.php.net
+yes | sudo pecl install imap
+```
+
+## Configurando o PHP
+
+Agora vamos rodar alguns comandos para habilitar a extensão do IMAP e também configurar parâmetros do PHP que o Apache irá usar para rodar o código do GLPI:
+
+```sh
+echo "extension=imap.so" | sudo tee /etc/php/8.4/mods-available/imap.ini
+sudo sed -i 's/^memory_limit = .*$/memory_limit = 256M/' "$PHP_INI"
+sudo sed -i 's/^post_max_size = .*$/post_max_size = 20M/' "$PHP_INI"
+sudo sed -i 's/^upload_max_filesize = .*$/upload_max_filesize = 20M/' "$PHP_INI"
+sudo sed -i 's/^max_execution_time = .*$/max_execution_time = 60/' "$PHP_INI"
+sudo sed -i 's/^max_input_vars = .*$/max_input_vars = 5000/' "$PHP_INI"
+sudo sed -i "s/^session.cookie_secure =.*$/session.cookie_secure = Off/" "$PHP_INI"
+sudo sed -i "s/^session.cookie_httponly =.*$/session.cookie_httponly = On/" "$PHP_INI"
+sudo sed -i 's/^session.cookie_samesite =.*$/session.cookie_samesite = Lax/' "$PHP_INI"
+sudo sed -i 's|^;date.timezone =.*$|date.timezone = America/Sao_Paulo|' "$PHP_INI"
+```
+
+## Baixando e Configurando o GLPI
+
+Primeiro, vamos criar alguns diretórios que vamos usar para os arquivos do GLPI:
+
+```sh
+sudo mkdir -p /etc/glpi
+sudo mkdir -p /var/lib/glpi
+sudo mkdir -p /var/log/glpi
+```
+
+Vamos baixar o código fonte da última versão disponível do GLPI e extraí-la:
+
+```sh
+cd /var/www/html
+sudo wget "https://github.com/glpi-project/glpi/releases/download/$GLPI_VERSION/glpi-$GLPI_VERSION.tgz"
+sudo tar -xvzf glpi-$GLPI_VERSION.tgz
+sudo rm glpi-$GLPI_VERSION.tgz
+```
+
+Alguns arquivos não irão ficar na raiz do servidor web, então vamos movê-los:
+
+```sh
+sudo mv /var/www/html/glpi/config /etc/glpi
+sudo mv /var/www/html/glpi/files /var/lib/glpi
+```
+
+E criar alguns diretórios adicionais:
+
+```sh
+sudo mkdir -p /var/lib/glpi/_cache \
+             /var/lib/glpi/_cron \
+             /var/lib/glpi/_graphs \
+             /var/lib/glpi/_locales \
+             /var/lib/glpi/_lock \
+             /var/lib/glpi/_pictures \
+             /var/lib/glpi/_plugins \
+             /var/lib/glpi/_rss \
+             /var/lib/glpi/_sessions \
+             /var/lib/glpi/_tmp \
+             /var/lib/glpi/_uploads \
+             /var/lib/glpi/_inventories \
+             /var/lib/glpi/_themes \
+             /var/lib/glpi/_dumps \
+```
+
+Agora, vamos criar o arquivo `downstream.php` que irá indicar para o nosso GLPI usar o arquivo `local_define.php` para carregar suas configurações:
+
+```sh
+sudo tee /var/www/html/glpi/inc/downstream.php > /dev/null <<'EOF'
+<?php
+
+define('GLPI_CONFIG_DIR', '/etc/glpi/');
+
+if (file_exists(GLPI_CONFIG_DIR . '/local_define.php')) {
+require_once GLPI_CONFIG_DIR . '/local_define.php';
+}
+EOF
+```
+
+E vamos criar o arquivo de `local_define.php` apontando os diretórios corretos para o GLPI usar e manter nossa instalação modular:
+
+```sh
+sudo tee /etc/glpi/local_define.php > /dev/null <<'EOF'
+<?php
+define('GLPI_VAR_DIR', '/var/lib/glpi');
+define('GLPI_DOC_DIR', GLPI_VAR_DIR);
+define('GLPI_CACHE_DIR', GLPI_VAR_DIR . '/_cache');
+define('GLPI_CRON_DIR', GLPI_VAR_DIR . '/_cron');
+define('GLPI_GRAPH_DIR', GLPI_VAR_DIR . '/_graphs');
+define('GLPI_LOCAL_I18N_DIR', GLPI_VAR_DIR . '/_locales');
+define('GLPI_LOCK_DIR', GLPI_VAR_DIR . '/_lock');
+define('GLPI_PICTURE_DIR', GLPI_VAR_DIR . '/_pictures');
+define('GLPI_PLUGIN_DOC_DIR', GLPI_VAR_DIR . '/_plugins');
+define('GLPI_RSS_DIR', GLPI_VAR_DIR . '/_rss');
+define('GLPI_SESSION_DIR', GLPI_VAR_DIR . '/_sessions');
+define('GLPI_TMP_DIR', GLPI_VAR_DIR . '/_tmp');
+define('GLPI_UPLOAD_DIR', GLPI_VAR_DIR . '/_uploads');
+define('GLPI_INVENTORY_DIR', GLPI_VAR_DIR . '/_inventories');
+define('GLPI_THEMES_DIR', GLPI_VAR_DIR . '/_themes');
+define('GLPI_LOG_DIR', '/var/log/glpi');
+EOF
+```
+
+Ajustar as permissões:
+
+```sh
+sudo chown www-data:www-data /var/www/html/glpi/ -R
+sudo chown www-data:www-data /etc/glpi -R
+sudo chown www-data:www-data /var/lib/glpi -R
+sudo chown www-data:www-data /var/log/glpi -R
+sudo chown www-data:www-data /var/www/html/glpi/marketplace -Rf
+sudo find /var/www/html/glpi/ -type f -exec chmod 0644 {} \;
+sudo find /var/www/html/glpi/ -type d -exec chmod 0755 {} \;
+sudo find /etc/glpi -type f -exec chmod 0644 {} \;
+sudo find /etc/glpi -type d -exec chmod 0755 {} \;
+sudo find /var/lib/glpi -type f -exec chmod 0644 {} \;
+sudo find /var/lib/glpi -type d -exec chmod 0755 {} \;
+sudo find /var/log/glpi -type f -exec chmod 0644 {} \;
+sudo find /var/log/glpi -type d -exec chmod 0755 {} \;
+```
+
+E configurar a aplicação do GLPI com as informações de acesso do banco de dados:
+
+```sh
+yes | sudo php glpi/bin/console db:install \
+  --db-host=${GLPI_DB_HOST} \
+  --db-name=${GLPI_DB} \
+  --db-user=${GLPI_DB_USER} \
+  --db-password=${GLPI_DB_PASSWORD}
+```
+
+E vamos ajustar o diretório de logs uma última vez, pois como rodamos a instalação como root, o arquivo de log foi criado pelo root:
+
+```sh
+sudo chown www-data:www-data /var/log/glpi -R
+```
+
+## Configuração do Apache
+
+Vamos criar o arquivo de configuração do Apache
+
+```sh
+sudo tee /etc/apache2/sites-available/glpi.conf > /dev/null <<EOF
+<VirtualHost *:${SERVER_PORT}>
+    ServerName ${SERVER_NAME}
+    DocumentRoot /var/www/html/glpi/public
+
+    <Directory /var/www/html/glpi/public>
+        Require all granted
+        RewriteEngine On
+
+        # Passar autenticação HTTP para o PHP
+        RewriteCond %{HTTP:Authorization} ^(.+)$
+        RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+        # Redirecionar requisições para index.php
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteRule ^(.*)$ index.php [QSA,L]
+    </Directory>
+</VirtualHost>
+EOF
+```
+
+E finalizar a instalação habilitando e desabilitando configurações/módulos/extensões do PHP e Apache:
+
+```sh
+sudo phpenmod imap
+sudo a2dissite 000-default.conf || true
+sudo a2enmod rewrite
+sudo a2ensite glpi.conf
+sudo systemctl restart apache2
+```
+
+Agora, basta acessar o domínio ou IP que configurou na variável `$SERVER_NAME`.
+![Página de Login do GLPI](/images/19/pagina_login_glpi.png)
+
+E usar o usuário `glpi` e senha `glpi` para ter acesso a sua instalação.
+![Página principal do GLPI](/images/19/dashboard_principal_glpi.png)

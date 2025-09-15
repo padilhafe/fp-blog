@@ -123,6 +123,27 @@ export const Blog = defineDocumentType(() => ({
         description: doc.summary,
         image: doc.images ? doc.images[0] : siteMetadata.socialBanner,
         url: `${siteMetadata.siteUrl}/${doc._raw.flattenedPath}`,
+        author: {
+          '@type': 'Person',
+          name: siteMetadata.author,
+          url: siteMetadata.siteUrl,
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: siteMetadata.title,
+          logo: {
+            '@type': 'ImageObject',
+            url: siteMetadata.siteLogo,
+          },
+        },
+        mainEntityOfPage: {
+          '@type': 'WebPage',
+          '@id': `${siteMetadata.siteUrl}/${doc._raw.flattenedPath}`,
+        },
+        keywords: Array.isArray(doc.tags) ? doc.tags.join(', ') : '',
+        articleSection: Array.isArray(doc.tags) && doc.tags.length > 0 ? doc.tags[0] : 'Blog',
+        wordCount: doc.body?.raw ? doc.body.raw.split(' ').length : 0,
+        inLanguage: siteMetadata.language,
       }),
     },
   },

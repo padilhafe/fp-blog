@@ -1,8 +1,8 @@
 {
-  "linux": 4,
-  "virtualizacao": 3,
   "devops": 2,
   "vagrant": 2,
-  "zabbix": 6,
-  "mikrotik": 2
+  "linux": 4,
+  "mikrotik": 2,
+  "virtualizacao": 3,
+  "zabbix": 6
 }

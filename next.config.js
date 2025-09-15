@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { withContentlayer } = require('next-contentlayer2')
 
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
@@ -52,6 +53,11 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=()',
   },
+  // Performance headers
+  {
+    key: 'Cache-Control',
+    value: 'public, max-age=31536000, immutable',
+  },
 ]
 
 const output = process.env.EXPORT ? 'export' : undefined
@@ -78,7 +84,19 @@ module.exports = () => {
           protocol: 'https',
           hostname: 'picsum.photos',
         },
+        {
+          protocol: 'https',
+          hostname: 'images.unsplash.com',
+        },
+        {
+          protocol: 'https',
+          hostname: 'via.placeholder.com',
+        },
       ],
+      formats: ['image/webp', 'image/avif'],
+      deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+      imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+      minimumCacheTTL: 60 * 60 * 24 * 30, // 30 dias
       unoptimized,
     },
     async headers() {

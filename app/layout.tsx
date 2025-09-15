@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     url: './',
     siteName: siteMetadata.title,
     images: [siteMetadata.socialBanner],
-    locale: 'en_US',
+    locale: 'pt_BR',
     type: 'website',
   },
   alternates: {
@@ -94,6 +94,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fff" />
       <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000" />
       <link rel="alternate" type="application/rss+xml" href={`${basePath}/feed.xml`} />
+
+      {/* Meta tags para SEO e Search Console */}
+      <meta name="author" content={siteMetadata.author} />
+      <meta
+        name="keywords"
+        content="tecnologia, infraestrutura, redes, linux, devops, zabbix, mikrotik, virtualização"
+      />
+      <meta name="geo.region" content="BR" />
+      <meta name="geo.country" content="Brasil" />
+      <meta name="language" content="pt-BR" />
+      <meta name="revisit-after" content="7 days" />
+      <meta name="distribution" content="global" />
+      <meta name="rating" content="general" />
       <body className="bg-white pl-[calc(100vw-100%)] text-black antialiased dark:bg-gray-950 dark:text-white">
         <ThemeProviders>
           <Analytics analyticsConfig={siteMetadata.analytics as AnalyticsConfig} />

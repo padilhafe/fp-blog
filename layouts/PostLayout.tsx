@@ -1,3 +1,5 @@
+'use client'
+
 import { ReactNode } from 'react'
 import { CoreContent } from 'pliny/utils/contentlayer'
 import type { Blog, Authors } from 'contentlayer/generated'
@@ -9,6 +11,11 @@ import Image from '@/components/Image'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
 import ScrollTopAndComment from '@/components/ScrollTopAndComment'
+import ReadingProgress from '@/components/ReadingProgress'
+import TableOfContents from '@/components/TableOfContents'
+import RelatedPosts from '@/components/RelatedPosts'
+import ViewCounter from '@/components/ViewCounter'
+import SocialShare from '@/components/SocialShare'
 
 const editUrl = (path) => `${siteMetadata.siteRepo}/blob/main/data/${path}`
 const discussUrl = (path) =>
@@ -27,14 +34,29 @@ interface LayoutProps {
   next?: { path: string; title: string }
   prev?: { path: string; title: string }
   children: ReactNode
+  allPosts?: CoreContent<Blog>[]
 }
 
-export default function PostLayout({ content, authorDetails, next, prev, children }: LayoutProps) {
-  const { filePath, path, slug, date, title, tags } = content
+export default function PostLayout({
+  content,
+  authorDetails,
+  next,
+  prev,
+  children,
+  allPosts = [],
+}: LayoutProps) {
+  const { filePath, path, slug, date, title, tags, toc, body, readingTime } = content
   const basePath = path.split('/')[0]
+  const postUrl = `${siteMetadata.siteUrl}/${path}`
+
+  // Usa o tempo de leitura calculado pelo Contentlayer (arredondado para cima)
+  const readingTimeText = readingTime
+    ? `${Math.ceil(readingTime.minutes)} min de leitura`
+    : '1 min de leitura'
 
   return (
     <SectionContainer>
+      <ReadingProgress />
       <ScrollTopAndComment />
       <article>
         <div className="xl:divide-y xl:divide-gray-200 xl:dark:divide-gray-700">
@@ -48,6 +70,20 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
                       {new Date(date).toLocaleDateString(siteMetadata.locale, postDateTemplate)}
                     </time>
                   </dd>
+                </div>
+                <div className="flex justify-center space-x-4">
+                  <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span>{readingTimeText}</span>
+                  </div>
+                  <ViewCounter slug={slug} />
                 </div>
               </dl>
               <div>
@@ -82,6 +118,15 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
             </dl>
             <div className="divide-y divide-gray-200 xl:col-span-3 xl:row-span-2 xl:pb-0 dark:divide-gray-700">
               <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
+
+              {/* Compartilhamento Social */}
+              <div className="py-6">
+                <SocialShare title={title} url={postUrl} />
+              </div>
+
+              {/* Posts Relacionados */}
+              {allPosts.length > 0 && <RelatedPosts posts={allPosts} currentPost={content} />}
+
               {siteMetadata.comments && (
                 <div
                   className="pt-6 pb-6 text-center text-gray-700 dark:text-gray-300"
@@ -93,6 +138,12 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
             </div>
             <footer>
               <div className="divide-gray-200 text-sm leading-5 font-medium xl:col-start-1 xl:row-start-2 xl:divide-y dark:divide-gray-700">
+                {/* Table of Contents */}
+                {toc && toc.length > 0 && (
+                  <div className="py-4 xl:py-8">
+                    <TableOfContents toc={toc} />
+                  </div>
+                )}
                 {tags && (
                   <div className="py-4 xl:py-8">
                     <h2 className="text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">

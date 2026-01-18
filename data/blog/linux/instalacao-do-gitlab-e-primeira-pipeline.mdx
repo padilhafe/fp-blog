@@ -1,0 +1,329 @@
+---
+title: 'Do Zero ao Deploy: Configurando GitLab CI/CD, Runners e Ansible para Infraestrutura como Código'
+date: '2026-01-19'
+tags: ['linux']
+draft: false
+summary: Aprenda a instalar o GitLab CE no Debian e configure um ambiente completo de DevOps. Este guia abrange desde a criação do primeiro repositório e configuração de Runners até a automação de deploys utilizando Ansible e GitLab CI.
+---
+# Índice
+
+- [Índice](#índice)
+- [Introdução ao Git e GitLab](#introdução-ao-git-e-gitlab)
+  - [O que é Git?](#o-que-é-git)
+    - [Principais características do Git](#principais-características-do-git)
+    - [Conceitos básicos do Git](#conceitos-básicos-do-git)
+    - [Exemplo simples](#exemplo-simples)
+  - [O que é GitLab?](#o-que-é-gitlab)
+    - [O que o GitLab oferece](#o-que-o-gitlab-oferece)
+    - [Componentes principais](#componentes-principais)
+  - [Diferença entre Git e GitLab](#diferença-entre-git-e-gitlab)
+  - [Conclusão](#conclusão)
+- [Laboratório](#laboratório)
+  - [Instalação do GitLab CE (Debian/Ubuntu)](#instalação-do-gitlab-ce-debianubuntu)
+    - [Pré-requisitos](#pré-requisitos)
+    - [Comandos de instalação](#comandos-de-instalação)
+    - [Criando o seu primeiro Repositório](#criando-o-seu-primeiro-repositório)
+    - [Como criar um Runner no Frontend do GitLab](#como-criar-um-runner-no-frontend-do-gitlab)
+  - [Configuração do Runner](#configuração-do-runner)
+    - [Instale o Docker na máquina runner](#instale-o-docker-na-máquina-runner)
+    - [Instalação e Configuração do Runner](#instalação-e-configuração-do-runner)
+    - [Preparando a conectividade](#preparando-a-conectividade)
+      - [Cadastrando Variável do tipo FILE (SSH Key)](#cadastrando-variável-do-tipo-file-ssh-key)
+      - [Configurando o Acesso no Servidor Destino (Authorized Keys)](#configurando-o-acesso-no-servidor-destino-authorized-keys)
+  - [Introdução ao GitLab CI](#introdução-ao-gitlab-ci)
+    - [O que é GitLab CI?](#o-que-é-gitlab-ci)
+    - [Conceitos básicos do GitLab CI](#conceitos-básicos-do-gitlab-ci)
+    - [Exemplo: GitLab CI executando Ansible para instalar Nginx](#exemplo-gitlab-ci-executando-ansible-para-instalar-nginx)
+      - [Estrutura do repositório](#estrutura-do-repositório)
+    - [Exemplo de inventory Ansible](#exemplo-de-inventory-ansible)
+    - [Exemplo de playbook Ansible (`playbook.yml`)](#exemplo-de-playbook-ansible-playbookyml)
+    - [Crie o arquivo de `.gitlab-ci.yml`](#crie-o-arquivo-de-gitlab-ciyml)
+
+---
+
+# Introdução ao Git e GitLab
+
+Este artigo tem como objetivo explicar de forma simples e direta **o que é Git** e **o que é GitLab**, além de esclarecer a diferença entre eles e como trabalham juntos no dia a dia do desenvolvimento de software.
+
+## O que é Git?
+
+**Git** é um **sistema de controle de versão distribuído**.
+
+Em termos simples, ele serve para:
+
+- **Controlar** alterações em arquivos ao longo do tempo  
+- **Permitir** que várias pessoas trabalhem no mesmo projeto  
+- **Registrar** o histórico completo de mudanças  
+- **Facilitar** o retorno a versões anteriores do código  
+
+### Principais características do Git
+
+- **Distribuído**: cada desenvolvedor possui uma cópia completa do repositório
+- **Rápido**: operações locais são extremamente eficientes
+- **Seguro**: histórico protegido contra alterações indevidas
+- **Flexível**: suporta diferentes fluxos de trabalho (Git Flow, Trunk-Based, etc.)
+
+### Conceitos básicos do Git
+
+| Conceito | Descrição |
+|--------|----------|
+| Repositório | Local onde o código e o histórico são armazenados |
+| Commit | Registro de uma alteração no código |
+| Branch | Linha paralela de desenvolvimento |
+| Merge | União de branches |
+| Clone | Cópia de um repositório |
+| Push | Envio de commits para um repositório remoto |
+| Pull | Atualização do repositório local |
+
+### Exemplo simples
+
+```bash
+git init
+git add .
+git commit -m "Primeiro commit"
+```
+
+## O que é GitLab?
+
+**GitLab** é uma **plataforma baseada em Git** que centraliza ferramentas para o ciclo completo de desenvolvimento de software (**DevOps**).
+
+Enquanto o Git é a ferramenta de versionamento, o GitLab é o **ambiente onde os repositórios são hospedados e gerenciados**.
+
+### O que o GitLab oferece
+
+- Hospedagem de repositórios Git
+- Interface web para gerenciamento de código
+- Controle de acesso e permissões
+- Merge Requests
+- Pipelines CI/CD
+- Issues, Boards e Wiki
+- Registry de containers
+- Monitoramento e segurança
+
+### Componentes principais
+
+| Componente | Função |
+|---------|-------|
+| GitLab Server | Onde ficam os repositórios e a interface web |
+| GitLab Runner | Executa os pipelines CI/CD |
+| CI/CD | Automação de testes, builds e deploys |
+
+## Diferença entre Git e GitLab
+
+| Git | GitLab |
+|---|-------|
+| Ferramenta de versionamento | Plataforma de gerenciamento |
+| Funciona via linha de comando | Interface web + APIs |
+| Não depende de servidor | Requer um servidor |
+| Controla versões | Orquestra todo o ciclo DevOps |
+
+## Conclusão
+
+- **Git** é essencial para controle de versões
+- **GitLab** potencializa o Git com colaboração e automação
+- Juntos, formam a base de práticas modernas de desenvolvimento
+
+---
+
+# Laboratório
+
+## Instalação do GitLab CE (Debian/Ubuntu)
+
+Esta seção descreve a instalação do GitLab Community Edition (CE) em um servidor Debian ou Ubuntu utilizando os repositórios oficiais do GitLab.
+
+### Pré-requisitos
+
+- Sistema operacional Debian ou Ubuntu
+- Acesso root ou sudo
+- Conectividade com a internet
+
+### Comandos de instalação
+```sh
+sudo apt update -y
+sudo apt install -y curl
+curl "https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh" | sudo bash
+sudo EXTERNAL_URL="http://192.168.56.10" GITLAB_ROOT_PASSWORD="Mudar@123" apt install -y gitlab-ce
+```
+
+Explicação dos parâmetros:
+- **EXTERNAL_URL**: URL de acesso ao GitLab (IP ou domínio)
+- **GITLAB_ROOT_PASSWORD**: senha inicial do usuário root
+
+### Criando o seu primeiro Repositório
+
+Para começar a utilizar o GitLab, você precisa criar um projeto (repositório):
+
+- Acesse o GitLab pelo IP definido na instalação.
+- No menu lateral ou na home, clique no botão New Project.
+- Selecione Create blank project.
+- Dê um nome ao projeto (ex: automacao-nginx).
+- Defina a visibilidade (Private ou Public) e clique em Create project.
+
+### Como criar um Runner no Frontend do GitLab
+
+O Runner é o agente que executa os comandos do seu pipeline. Siga estes passos na interface web:
+
+- Acesse o seu Projeto ou Grupo.
+- No menu lateral esquerdo, vá em Settings > CI/CD.
+- Procure a seção Runners e clique em Expand.
+- Clique no botão New project runner.
+- Selecione o sistema operacional (Linux) e, se desejar, adicione tags (ex: deploy).
+- Clique em Create runner.
+
+> O GitLab exibirá um comando de registro e um Token. Salve esse token, pois ele será usado na configuração do servidor.
+
+## Configuração do Runner
+
+### Instale o Docker na máquina runner
+
+```sh
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+### Instalação e Configuração do Runner
+
+Primeiro, baixe e instale o binário do runner:
+```sh
+curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" -o script.deb.sh 
+sudo bash script.deb.sh
+sudo apt install gitlab-runner gitlab-runner-helper-images
+```
+
+Agora, cole o comando gerado no seu servidor Gitlab. Quando for perguntado qual a imagem base usar, pode preencher com `alpine:latest`.
+
+Crie um par de chaves, para usarmos como método de autenticação na máquina que será instalado o Nginx.
+```sh
+ssh-keygen -t ed25519 -C "runner@localdomain.com"
+```
+
+### Preparando a conectividade
+#### Cadastrando Variável do tipo FILE (SSH Key)
+Para que o pipeline acesse servidores externos via Ansible, precisamos armazenar a chave privada de forma segura:
+
+- No seu projeto, vá em Settings > CI/CD.
+- Expanda a seção Variables e clique em Add variable.
+- Em Key, digite SSH_PRIVATE_KEY.
+- Em Value, cole o conteúdo da sua chave privada (id_ed25519).
+- Em Type, mude de "Variable" para File. Isso é crucial para que o GitLab trate o conteúdo como um arquivo temporário no runner.
+- Clique em Add variable.
+
+#### Configurando o Acesso no Servidor Destino (Authorized Keys)
+
+O Runner precisa de permissão para entrar no servidor onde o Nginx será instalado.
+
+- No servidor de destino (ex: 192.168.56.12), acesse o usuário que o Ansible usará.
+- Edite o arquivo de chaves autorizadas:
+```sh
+nano ~/.ssh/authorized_keys
+
+# Cole o conteúdo da sua Chave Pública (id_ed25519.pub) em uma nova linha.
+# Salve e saia. Isso permitirá que o Runner, portando a chave privada (via variável FILE), conecte-se sem senha.
+```
+
+---
+
+## Introdução ao GitLab CI
+
+### O que é GitLab CI?
+
+**GitLab CI (Continuous Integration)** é o mecanismo de automação do GitLab responsável por executar tarefas automaticamente sempre que ocorre um evento no repositório, como um *push* ou *merge request*.
+
+Com o GitLab CI, é possível:
+
+- Executar testes automaticamente
+- Realizar builds de aplicações
+- Validar código
+- Automatizar deploys
+- Orquestrar tarefas de infraestrutura (IaC)
+
+Tudo isso é definido através de um arquivo chamado **`.gitlab-ci.yml`**, que fica na raiz do repositório.
+
+### Conceitos básicos do GitLab CI
+
+| Conceito | Descrição |
+|-------|---------|
+| Pipeline | Conjunto de etapas executadas automaticamente |
+| Job | Tarefa individual dentro do pipeline |
+| Stage | Fase do pipeline (ex: build, test, deploy) |
+| Runner | Máquina que executa os jobs |
+| `.gitlab-ci.yml` | Arquivo de definição do pipeline |
+
+### Exemplo: GitLab CI executando Ansible para instalar Nginx
+
+Abaixo está um exemplo simples de pipeline que executa um **playbook Ansible** para instalar o **Nginx** em um servidor Linux.
+
+#### Estrutura do repositório
+
+```
+.
+├── .gitlab-ci.yml
+├── inventory.ini
+└── playbook.yml
+```
+
+### Exemplo de inventory Ansible
+
+```ini
+[web]
+192.168.56.12 ansible_user=vagrant
+```
+
+> Ajuste o usuário, IP e método de autenticação conforme o seu ambiente.
+
+### Exemplo de playbook Ansible (`playbook.yml`)
+
+```yaml
+- name: Instala e configura o Nginx
+  hosts: web
+  become: true
+  tasks:
+    - name: Instalar nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Garantir que o nginx esteja ativo
+      service:
+        name: nginx
+        state: started
+        enabled: true
+```
+
+### Crie o arquivo de `.gitlab-ci.yml`
+
+Crie este arquivo na raiz do seu repositório para definir o fluxo de deploy:
+```yaml
+stages:
+  - deploy
+
+deploy_nginx:
+  stage: deploy
+  image: alpine/ansible
+  before_script:
+    - export ANSIBLE_HOST_KEY_CHECKING=False
+    - chmod 600 "$SSH_PRIVATE_KEY"
+    - eval $(ssh-agent -s)
+    - ssh-add "$SSH_PRIVATE_KEY" 
+  script:
+    - ansible-playbook -i inventory.ini playbook.yml
+  only:
+    - main
+```
+
+Neste fluxo, o GitLab CI lê a variável $SSH_PRIVATE_KEY (que é um caminho para um arquivo, pois definimos como tipo FILE), ajusta as permissões e a carrega no agente SSH para que o Ansible consiga realizar o acesso remoto de forma transparente.
